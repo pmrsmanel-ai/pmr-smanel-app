@@ -534,7 +534,11 @@ function AdminDashboardView({ data, user, actions }) {
 
   const handleShareReport = async () => {
     const dateStr = new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-    const reportText = `*📊 LAPORAN KEUANGAN PMR SMANEL*\nTanggal: ${dateStr}\n\n*💰 RINGKASAN KAS:*\n🟢 Total Pemasukan: Rp ${stats.inc.toLocaleString('id-ID')}\n🔴 Total Pengeluaran: Rp ${stats.exp.toLocaleString('id-ID')}\n🔵 *Saldo Akhir Aktif: Rp ${stats.bal.toLocaleString('id-ID')}*\n\n*📝 RINCIAN TAGIHAN & DENDA:*\n- Total Tunggakan Terbuka: Rp ${stats.debt.toLocaleString('id-ID')} (${stats.debtCount} Tagihan)\n- Pengeluaran Tercatat: ${stats.expCount} Item\n\nMohon bagi anggota yang masih memiliki tunggakan kas atau denda untuk segera menyelesaikannya. Terima kasih! 🙏\n\n_Sistem Manajemen PMR SMANEL_`;
+    
+    // Mengambil URL website saat ini secara otomatis
+    const webLink = window.location.origin; 
+
+    const reportText = `*📊 LAPORAN KEUANGAN PMR SMANEL*\nTanggal: ${dateStr}\n\n*💰 RINGKASAN KAS:*\n🟢 Total Pemasukan: Rp ${stats.inc.toLocaleString('id-ID')}\n🔴 Total Pengeluaran: Rp ${stats.exp.toLocaleString('id-ID')}\n🔵 *Saldo Akhir Aktif: Rp ${stats.bal.toLocaleString('id-ID')}*\n\n*📝 RINCIAN TAGIHAN & DENDA:*\n- Total Tunggakan Terbuka: Rp ${stats.debt.toLocaleString('id-ID')} (${stats.debtCount} Tagihan)\n- Pengeluaran Tercatat: ${stats.expCount} Item\n\n*🔗 LINK CEK TUNGGAKAN & DASHBOARD ANGGOTA:*\nSilakan klik tautan di bawah ini untuk melihat rincian tunggakan pribadi dan transparansi laporan secara lengkap:\n👉 ${webLink}\n\nMohon bagi anggota yang masih memiliki tunggakan kas atau denda untuk segera menyelesaikannya. Terima kasih! 🙏\n\n_Sistem Manajemen PMR SMANEL_`;
 
     if (navigator.share) {
       try {
