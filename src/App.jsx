@@ -600,7 +600,32 @@ function AdminDashboardView({ data, user, actions }) {
     const webLink = baseUrl; 
     const tunggakanLink = `${baseUrl}?view=tunggakan`;
 
-    const reportText = `*📊 LAPORAN KEUANGAN PMR SMANEL*\nTanggal: ${dateStr}\n\n*💰 RINGKASAN KAS:*\n🟢 Pemasukan Uang Kas: Rp ${stats.incKas.toLocaleString('id-ID')}\n🟠 Pemasukan Denda: Rp ${stats.incDenda.toLocaleString('id-ID')}\n🔴 Total Pengeluaran: Rp ${stats.exp.toLocaleString('id-ID')}\n🔵 *Saldo Akhir Aktif: Rp ${stats.bal.toLocaleString('id-ID')}*\n\n*📝 RINCIAN TAGIHAN & DENDA:*\n- Tunggakan Kas: Rp ${stats.debtKas.toLocaleString('id-ID')} (${stats.debtKasCount} Tagihan)\n- Tunggakan Denda: Rp ${stats.debtDenda.toLocaleString('id-ID')} (${stats.debtDendaCount} Tagihan)\n- Pengeluaran Tercatat: ${stats.expCount} Item\n\n*🔗 LINK AKSES ANGGOTA:*\n\n1️⃣ *Cek Daftar Tunggakan Langsung:*\n👉 ${tunggakanLink}\n\n2️⃣ *Dashboard Utama (Transparansi):*\n👉 ${webLink}\n\nMohon bagi anggota yang masih memiliki tunggakan kas atau denda untuk segera menyelesaikannya. Terima kasih! 🙏\n\n_Sistem Manajemen PMR SMANEL_`;
+    const reportText = `*📊 LAPORAN KEUANGAN PMR SMANEL*
+Tanggal: ${dateStr}
+
+*💰 ARUS KAS:*
+🟢 Pemasukan Uang Kas: Rp ${stats.incKas.toLocaleString('id-ID')}
+🟠 Pemasukan Denda: Rp ${stats.incDenda.toLocaleString('id-ID')}
+✨ *Total Masuk: Rp ${stats.inc.toLocaleString('id-ID')}*
+🔴 Total Pengeluaran: Rp ${stats.exp.toLocaleString('id-ID')}
+------------------------
+🔵 *SALDO AKTIF: Rp ${stats.bal.toLocaleString('id-ID')}*
+
+*📝 TUNGGAKAN AKTIF:*
+- Tunggakan Kas: Rp ${stats.debtKas.toLocaleString('id-ID')} (${stats.debtKasCount} Item)
+- Tunggakan Denda: Rp ${stats.debtDenda.toLocaleString('id-ID')} (${stats.debtDendaCount} Item)
+⚠️ *Total Piutang: Rp ${stats.debt.toLocaleString('id-ID')}*
+
+*🔗 LINK AKSES ANGGOTA:*
+1️⃣ *Cek Daftar Tunggakan:*
+👉 ${tunggakanLink}
+
+2️⃣ *Dashboard Transparansi:*
+👉 ${webLink}
+
+Mohon bagi anggota yang masih memiliki tunggakan kas atau denda untuk segera melunasi. Terima kasih! 🙏
+
+_Sistem Manajemen PMR SMANEL_`;
 
     if (navigator.share) {
       try { await navigator.share({ title: 'Laporan Keuangan PMR', text: reportText }); } catch (error) { console.log('Batal', error); }
