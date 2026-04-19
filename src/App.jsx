@@ -2,12 +2,12 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   LayoutDashboard, UserCheck, Wallet, Users, LogOut, Search, Filter, AlertCircle, CheckCircle2, 
   Clock, Loader2, History, Save, ShieldCheck, ClipboardList, Lock, User as UserIcon, Eye, EyeOff, 
-  Settings, Edit2, X, PlusCircle, TrendingDown, TrendingUp, Receipt, Menu, Coins, Trash2, CheckSquare, Calendar, ArrowLeft
+  Settings, Edit2, X, PlusCircle, TrendingDown, TrendingUp, Receipt, Menu, Coins, Trash2, CheckSquare, Calendar, ArrowLeft, Share2
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 // URL API Google Apps Script 
-const API_URL = "https://script.google.com/macros/s/AKfycbydQdPuZ3p5b85NphI4xWnfc0SjWZo85ZdZ3uxkHTTKmDvSZ8xzXj8ZjdMkh4-48ts_xQ/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbxfo-tgjZY4t_-gy0J90V_OatMAzzVhqztNnWou0mrLnSdpSjhMj_jKFhtv_b1g_Ho-kA/exec";
 
 // === KONFIGURASI LOGO ===
 const LOGO_URL = "https://i.ibb.co/KjMWMJMf/Tim-lkp-IV.jpg";
@@ -48,6 +48,9 @@ function AppLogo({ className, fallbackSize = 24 }) {
 
 // === 1. HALAMAN DASHBOARD PUBLIK ===
 function PublicDashboard({ data, onLoginClick, loading }) {
+  const [detailView, setDetailView] = useState(null); // null, 'Hadir', 'Alpha', 'Sakit', 'Izin'
+  const [financeDetailView, setFinanceDetailView] = useState(null); // null, 'Pemasukan', 'Pengeluaran', 'Tunggakan'
+
   const stats = useMemo(() => {
     const incList = data.finance.filter(f => f.Status === 'Lunas');
     const debtList = data.finance.filter(f => f.Status === 'Belum Lunas');
@@ -57,9 +60,33 @@ function PublicDashboard({ data, onLoginClick, loading }) {
       inc, exp, bal: inc - exp, 
       incCount: incList.length, 
       debtCount: debtList.length, 
-      expCount: data.expenses.length 
+      expCount: data.expenses.length,
+      incList,
+      debtList,
+      expList: data.expenses
     };
   }, [data.finance, data.expenses]);
+
+  const latestAttendance = useMemo(() => {
+    if (!data.history || data.history.length === 0) return null;
+    // Mengambil kegiatan teratas (terbaru)
+    const latest = data.history[0];
+    // Memfilter semua data yang masuk di kegiatan & tanggal yang sama
+    const records = data.history.filter(h => h.Tanggal === latest.Tanggal && h.Kegiatan === latest.Kegiatan);
+    
+    return {
+      tanggal: latest.Tanggal,
+      kegiatan: latest.Kegiatan,
+      waktu: latest.Waktu,
+      grouped: {
+        Hadir: records.filter(r => r.Status === 'Hadir'),
+        Sakit: records.filter(r => r.Status === 'Sakit'),
+        Izin: records.filter(r => r.Status === 'Izin'),
+        Alpha: records.filter(r => r.Status === 'Alpha'),
+        Terlambat: records.filter(r => r.Status === 'Terlambat'),
+      }
+    };
+  }, [data.history]);
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans flex flex-col text-gray-800">
@@ -94,77 +121,203 @@ function PublicDashboard({ data, onLoginClick, loading }) {
         ) : (
           <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-white border border-gray-300 rounded shadow-sm">
+              {/* Saldo Kas */}
+              <div className="bg-white border border-gray-300 rounded shadow-sm flex flex-col">
                 <div className="bg-gray-100 px-4 py-3 border-b border-gray-300 font-semibold text-gray-700 flex justify-between">
                   Saldo Kas <Wallet size={18} className="text-gray-500"/>
                 </div>
-                <div className="p-5">
+                <div className="p-5 flex-1">
                   <h2 className="text-3xl font-bold text-gray-800">Rp {stats.bal.toLocaleString('id-ID')}</h2>
                 </div>
               </div>
-              <div className="bg-white border border-gray-300 rounded shadow-sm">
+              
+              {/* Pemasukan */}
+              <div className="bg-white border border-gray-300 rounded shadow-sm flex flex-col">
                 <div className="bg-gray-100 px-4 py-3 border-b border-gray-300 font-semibold text-gray-700 flex justify-between">
                   Pemasukan <TrendingUp size={18} className="text-green-600"/>
                 </div>
-                <div className="p-5">
+                <div className="p-5 flex-1">
                   <h2 className="text-3xl font-bold text-green-600">Rp {stats.inc.toLocaleString('id-ID')}</h2>
                 </div>
+                <button onClick={() => setFinanceDetailView('Pemasukan')} className="bg-gray-50 border-t border-gray-200 text-xs font-semibold text-gray-600 py-2.5 hover:bg-gray-200 transition-colors flex justify-center items-center gap-1 w-full rounded-b">
+                  <Search size={14}/> Lihat Detail Pemasukan
+                </button>
               </div>
-              <div className="bg-white border border-gray-300 rounded shadow-sm">
+
+              {/* Pengeluaran */}
+              <div className="bg-white border border-gray-300 rounded shadow-sm flex flex-col">
                 <div className="bg-gray-100 px-4 py-3 border-b border-gray-300 font-semibold text-gray-700 flex justify-between">
                   Pengeluaran <TrendingDown size={18} className="text-red-600"/>
                 </div>
-                <div className="p-5">
+                <div className="p-5 flex-1">
                   <h2 className="text-3xl font-bold text-red-600">Rp {stats.exp.toLocaleString('id-ID')}</h2>
                 </div>
+                <button onClick={() => setFinanceDetailView('Pengeluaran')} className="bg-gray-50 border-t border-gray-200 text-xs font-semibold text-gray-600 py-2.5 hover:bg-gray-200 transition-colors flex justify-center items-center gap-1 w-full rounded-b">
+                  <Search size={14}/> Lihat Detail Pengeluaran
+                </button>
               </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="bg-white border border-gray-300 rounded shadow-sm flex flex-col">
+              <div className="bg-white border border-gray-300 rounded shadow-sm flex flex-col h-[380px]">
                 <div className="bg-gray-100 px-4 py-3 border-b border-gray-300 font-semibold flex justify-between items-center">
-                  <div className="flex items-center gap-2"><ClipboardList size={18} className="text-gray-600"/> Aktivitas Presensi Terbaru</div>
-                  <span className="bg-blue-600 text-white text-xs px-2 py-1 rounded">{data.students.length} Anggota</span>
+                  <div className="flex items-center gap-2"><ClipboardList size={18} className="text-gray-600"/> Ringkasan Presensi Terakhir</div>
+                  <span className="bg-blue-600 text-white text-xs px-2 py-1 rounded">Total {data.students.length} Anggota</span>
                 </div>
-                <div className="p-0 overflow-y-auto h-80">
-                  <ul className="divide-y divide-gray-200 m-0">
-                    {data.history.slice(0, 10).map((h, i) => (
-                      <li key={i} className="px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between hover:bg-gray-50 transition-colors gap-2">
-                        <div>
-                          <p className="font-semibold text-sm text-gray-800">{h.NamaSiswa}</p>
-                          <p className="text-xs text-gray-500">{h.Tanggal} • {h.Kegiatan}</p>
-                        </div>
-                        <span className={`px-2 py-1 rounded text-xs font-semibold border ${h.Status === 'Hadir' ? 'bg-green-100 text-green-800 border-green-200' : 'bg-red-100 text-red-800 border-red-200'}`}>{h.Status}</span>
-                      </li>
-                    ))}
-                    {data.history.length === 0 && <li className="p-8 text-center text-gray-500 text-sm">Belum ada kegiatan tercatat.</li>}
-                  </ul>
+                <div className="p-5 flex-1 flex flex-col">
+                  {latestAttendance ? (
+                    <>
+                      <div className="mb-5 text-center">
+                        <h3 className="text-lg font-bold text-gray-800 truncate">{latestAttendance.kegiatan}</h3>
+                        <p className="text-sm text-gray-500">{latestAttendance.tanggal} • {latestAttendance.waktu}</p>
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-2">
+                         <div onClick={() => setDetailView('Hadir')} className="bg-green-50 border border-green-200 p-3 rounded text-center flex flex-col justify-center cursor-pointer hover:bg-green-100 transition-colors shadow-sm">
+                            <p className="text-xs text-green-600 font-bold uppercase mb-1">Hadir</p>
+                            <p className="text-2xl font-black text-green-700">{latestAttendance.grouped.Hadir.length}</p>
+                            <div className="mt-2 text-[10px] text-green-700 font-semibold bg-green-200/50 py-0.5 rounded flex items-center justify-center gap-1"><Search size={12}/> Detail</div>
+                         </div>
+                         <div onClick={() => setDetailView('Alpha')} className="bg-red-50 border border-red-200 p-3 rounded text-center flex flex-col justify-center cursor-pointer hover:bg-red-100 transition-colors shadow-sm">
+                            <p className="text-xs text-red-600 font-bold uppercase mb-1">Alpha</p>
+                            <p className="text-2xl font-black text-red-700">{latestAttendance.grouped.Alpha.length}</p>
+                            <div className="mt-2 text-[10px] text-red-700 font-semibold bg-red-200/50 py-0.5 rounded flex items-center justify-center gap-1"><Search size={12}/> Detail</div>
+                         </div>
+                         <div onClick={() => setDetailView('Sakit')} className="bg-yellow-50 border border-yellow-200 p-3 rounded text-center flex flex-col justify-center cursor-pointer hover:bg-yellow-100 transition-colors shadow-sm">
+                            <p className="text-xs text-yellow-600 font-bold uppercase mb-1">Sakit</p>
+                            <p className="text-2xl font-black text-yellow-700">{latestAttendance.grouped.Sakit.length}</p>
+                            <div className="mt-2 text-[10px] text-yellow-700 font-semibold bg-yellow-200/50 py-0.5 rounded flex items-center justify-center gap-1"><Search size={12}/> Detail</div>
+                         </div>
+                         <div onClick={() => setDetailView('Izin')} className="bg-blue-50 border border-blue-200 p-3 rounded text-center flex flex-col justify-center cursor-pointer hover:bg-blue-100 transition-colors shadow-sm">
+                            <p className="text-xs text-blue-600 font-bold uppercase mb-1">Izin</p>
+                            <p className="text-2xl font-black text-blue-700">{latestAttendance.grouped.Izin.length}</p>
+                            <div className="mt-2 text-[10px] text-blue-700 font-semibold bg-blue-200/50 py-0.5 rounded flex items-center justify-center gap-1"><Search size={12}/> Detail</div>
+                         </div>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center text-gray-500 text-sm">Belum ada kegiatan presensi.</div>
+                  )}
                 </div>
               </div>
 
-              <div className="bg-white border border-gray-300 rounded shadow-sm flex flex-col">
+              <div className="bg-white border border-gray-300 rounded shadow-sm flex flex-col h-[380px]">
                 <div className="bg-gray-100 px-4 py-3 border-b border-gray-300 font-semibold flex items-center gap-2">
                   <Receipt size={18} className="text-gray-600"/> Rincian Total Transaksi
                 </div>
                 <div className="p-4 flex-1">
-                   <p className="text-sm text-gray-600 mb-4">Berikut adalah rincian jumlah aktivitas pencatatan keuangan yang terjadi di dalam sistem berdasarkan kategorinya:</p>
+                   <p className="text-sm text-gray-600 mb-4">Berikut adalah rincian jumlah pencatatan keuangan. <span className="font-semibold text-blue-600">Klik baris untuk melihat detailnya:</span></p>
                    <ul className="list-none border border-gray-200 rounded p-0 m-0">
-                      <li className="border-b border-gray-200 px-4 py-3 flex justify-between items-center bg-gray-50">
+                      <li onClick={() => setFinanceDetailView('Pemasukan')} className="border-b border-gray-200 px-4 py-3 flex justify-between items-center bg-gray-50 cursor-pointer hover:bg-blue-50 transition-colors">
                         <span className="font-medium text-gray-700">Dana Masuk (Telah Lunas)</span>
-                        <span className="bg-green-600 text-white text-xs px-3 py-1 rounded-full">{stats.incCount} Record</span>
+                        <div className="flex items-center gap-2">
+                          <span className="bg-green-600 text-white text-xs px-3 py-1 rounded-full">{stats.incCount} Record</span>
+                          <Search size={14} className="text-gray-400"/>
+                        </div>
                       </li>
-                      <li className="border-b border-gray-200 px-4 py-3 flex justify-between items-center bg-white">
+                      <li onClick={() => setFinanceDetailView('Tunggakan')} className="border-b border-gray-200 px-4 py-3 flex justify-between items-center bg-white cursor-pointer hover:bg-blue-50 transition-colors">
                         <span className="font-medium text-gray-700">Tunggakan Kas / Denda</span>
-                        <span className="bg-yellow-500 text-white text-xs px-3 py-1 rounded-full">{stats.debtCount} Record</span>
+                        <div className="flex items-center gap-2">
+                          <span className="bg-yellow-500 text-white text-xs px-3 py-1 rounded-full">{stats.debtCount} Record</span>
+                          <Search size={14} className="text-gray-400"/>
+                        </div>
                       </li>
-                      <li className="px-4 py-3 flex justify-between items-center bg-gray-50">
+                      <li onClick={() => setFinanceDetailView('Pengeluaran')} className="px-4 py-3 flex justify-between items-center bg-gray-50 cursor-pointer hover:bg-blue-50 transition-colors">
                         <span className="font-medium text-gray-700">Log Pengeluaran Organisasi</span>
-                        <span className="bg-red-600 text-white text-xs px-3 py-1 rounded-full">{stats.expCount} Record</span>
+                        <div className="flex items-center gap-2">
+                          <span className="bg-red-600 text-white text-xs px-3 py-1 rounded-full">{stats.expCount} Record</span>
+                          <Search size={14} className="text-gray-400"/>
+                        </div>
                       </li>
                    </ul>
                 </div>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Modal Detail Keuangan Publik */}
+        {financeDetailView && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
+             <div className="bg-white rounded border border-gray-300 shadow-xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
+               <div className="bg-gray-100 px-5 py-4 border-b border-gray-300 flex justify-between items-center">
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-800">Daftar Transaksi: <span className="text-blue-600 uppercase">{financeDetailView}</span></h3>
+                    <p className="text-sm text-gray-500">Rincian data {financeDetailView.toLowerCase()} organisasi</p>
+                  </div>
+                  <button onClick={() => setFinanceDetailView(null)} className="text-gray-500 hover:text-red-600 transition-colors bg-white hover:bg-red-50 p-1.5 rounded border border-transparent hover:border-red-200"><X size={20}/></button>
+               </div>
+               <div className="p-0 overflow-y-auto flex-1 bg-gray-50">
+                  <ul className="divide-y divide-gray-200 m-0">
+                    {financeDetailView === 'Pemasukan' && stats.incList.length > 0 ? stats.incList.map((item, i) => (
+                      <li key={i} className="px-5 py-3 bg-white hover:bg-gray-50 transition-colors flex justify-between items-center gap-2">
+                        <div>
+                          <p className="font-semibold text-sm text-gray-800 uppercase">{item.NamaSiswa}</p>
+                          <p className="text-xs text-gray-500">{item.Tanggal} • {item.Kategori}</p>
+                        </div>
+                        <span className="font-bold text-green-600 text-sm whitespace-nowrap">+ Rp {Number(item.Nominal).toLocaleString('id-ID')}</span>
+                      </li>
+                    )) : financeDetailView === 'Pemasukan' && <li className="p-8 text-center text-gray-500 text-sm">Belum ada data pemasukan.</li>}
+
+                    {financeDetailView === 'Tunggakan' && stats.debtList.length > 0 ? stats.debtList.map((item, i) => (
+                      <li key={i} className="px-5 py-3 bg-white hover:bg-gray-50 transition-colors flex justify-between items-center gap-2">
+                        <div>
+                          <p className="font-semibold text-sm text-gray-800 uppercase">{item.NamaSiswa}</p>
+                          <p className="text-xs text-gray-500">{item.Tanggal} • {item.Kategori}</p>
+                        </div>
+                        <span className="font-bold text-red-600 text-sm whitespace-nowrap">Rp {Number(item.Nominal).toLocaleString('id-ID')}</span>
+                      </li>
+                    )) : financeDetailView === 'Tunggakan' && <li className="p-8 text-center text-gray-500 text-sm">Semua anggota bebas tunggakan.</li>}
+
+                    {financeDetailView === 'Pengeluaran' && stats.expList.length > 0 ? stats.expList.map((item, i) => (
+                      <li key={i} className="px-5 py-3 bg-white hover:bg-gray-50 transition-colors flex justify-between items-center gap-2">
+                        <div>
+                          <p className="font-semibold text-sm text-gray-800 uppercase">{item.Deskripsi}</p>
+                          <p className="text-xs text-gray-500">{item.Tanggal} • {item.Kategori}</p>
+                        </div>
+                        <span className="font-bold text-red-600 text-sm whitespace-nowrap">- Rp {Number(item.Nominal).toLocaleString('id-ID')}</span>
+                      </li>
+                    )) : financeDetailView === 'Pengeluaran' && <li className="p-8 text-center text-gray-500 text-sm">Belum ada data pengeluaran.</li>}
+                  </ul>
+               </div>
+             </div>
+          </div>
+        )}
+
+        {/* Modal Detail Presensi Publik Per Kategori */}
+        {detailView && latestAttendance && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
+             <div className="bg-white rounded border border-gray-300 shadow-xl w-full max-w-md max-h-[85vh] flex flex-col overflow-hidden">
+               <div className="bg-gray-100 px-5 py-4 border-b border-gray-300 flex justify-between items-center">
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-800">Daftar Anggota: <span className="uppercase text-blue-600">{detailView}</span></h3>
+                    <p className="text-sm text-gray-500">{latestAttendance.kegiatan} • {latestAttendance.tanggal}</p>
+                  </div>
+                  <button onClick={() => setDetailView(null)} className="text-gray-500 hover:text-red-600 transition-colors bg-white hover:bg-red-50 p-1.5 rounded border border-transparent hover:border-red-200"><X size={20}/></button>
+               </div>
+               <div className="p-5 overflow-y-auto flex-1 bg-gray-50">
+                  {latestAttendance.grouped[detailView] && latestAttendance.grouped[detailView].length > 0 ? (
+                    <ul className="space-y-2">
+                      {latestAttendance.grouped[detailView].map((r, i) => {
+                         const colorMap = {
+                           Hadir: 'bg-green-500',
+                           Sakit: 'bg-yellow-500',
+                           Izin: 'bg-blue-500',
+                           Alpha: 'bg-red-500',
+                           Terlambat: 'bg-orange-500',
+                         };
+                         return (
+                           <li key={i} className="text-sm font-medium text-gray-700 bg-white px-4 py-3 rounded border border-gray-200 uppercase flex items-center gap-3 shadow-sm hover:shadow transition-shadow">
+                             <div className={`w-3 h-3 rounded-full ${colorMap[detailView]}`}></div>
+                             <span className="truncate">{r.NamaSiswa}</span>
+                           </li>
+                         )
+                      })}
+                    </ul>
+                  ) : (
+                    <div className="text-center text-gray-500 py-8 border-2 border-dashed border-gray-300 rounded">Tidak ada anggota dengan status {detailView}.</div>
+                  )}
+               </div>
+             </div>
           </div>
         )}
       </main>
@@ -360,7 +513,7 @@ function getLabel(v){ const l={'attendance-recap':'Arsip','attendance-input':'In
 
 // === 3. SUB-VIEWS PENGURUS ===
 
-function AdminDashboardView({ data }) {
+function AdminDashboardView({ data, user, actions }) {
   const stats = useMemo(() => {
     const incList = data.finance.filter(f => f.Status === 'Lunas');
     const debtList = data.finance.filter(f => f.Status === 'Belum Lunas');
@@ -372,11 +525,48 @@ function AdminDashboardView({ data }) {
       { name: 'Pengeluaran', value: exp },
       { name: 'Piutang', value: debt }
     ];
-    return { inc, exp, debt, bal: inc - exp, chartData, incCount: incList.length, debtCount: debtList.length, expCount: data.expenses.length };
+    return { 
+      inc, exp, debt, bal: inc - exp, chartData, 
+      incCount: incList.length, debtCount: debtList.length, expCount: data.expenses.length,
+      unpaidList: debtList, paidList: incList, expenseList: data.expenses 
+    };
   }, [data]);
+
+  const handleShareReport = async () => {
+    const dateStr = new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    const reportText = `*📊 LAPORAN KEUANGAN PMR SMANEL*\nTanggal: ${dateStr}\n\n*💰 RINGKASAN KAS:*\n🟢 Total Pemasukan: Rp ${stats.inc.toLocaleString('id-ID')}\n🔴 Total Pengeluaran: Rp ${stats.exp.toLocaleString('id-ID')}\n🔵 *Saldo Akhir Aktif: Rp ${stats.bal.toLocaleString('id-ID')}*\n\n*📝 RINCIAN TAGIHAN & DENDA:*\n- Total Tunggakan Terbuka: Rp ${stats.debt.toLocaleString('id-ID')} (${stats.debtCount} Tagihan)\n- Pengeluaran Tercatat: ${stats.expCount} Item\n\nMohon bagi anggota yang masih memiliki tunggakan kas atau denda untuk segera menyelesaikannya. Terima kasih! 🙏\n\n_Sistem Manajemen PMR SMANEL_`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'Laporan Keuangan PMR',
+          text: reportText,
+        });
+      } catch (error) {
+        console.log('User membatalkan share', error);
+      }
+    } else {
+      try {
+        await navigator.clipboard.writeText(reportText);
+        if (actions && actions.showToast) actions.showToast("Laporan berhasil disalin ke clipboard!");
+      } catch(e) {
+        if (actions && actions.showToast) actions.showToast("Gagal menyalin laporan", "error");
+      }
+    }
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
+      {/* Header dengan Tombol Share */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <h2 className="text-xl font-bold text-gray-800">Ikhtisar Sistem</h2>
+        {(user?.role === ROLES.ADMIN || user?.role === ROLES.BENDAHARA) && (
+          <button onClick={handleShareReport} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded text-sm font-medium transition-colors flex items-center justify-center gap-2 shadow-sm border border-green-700">
+            <Share2 size={16}/> Bagikan Laporan Kas WA
+          </button>
+        )}
+      </div>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard label="Total Pemasukan" val={stats.inc} color="green" icon={<TrendingUp size={16}/>} />
         <StatCard label="Total Pengeluaran" val={stats.exp} color="red" icon={<TrendingDown size={16}/>} />
@@ -425,6 +615,74 @@ function AdminDashboardView({ data }) {
              </div>
           </div>
         </div>
+      </div>
+
+      {/* --- TAMBAHAN: RINCIAN DETAIL TRANSAKSI UNTUK LAPORAN BENDAHARA --- */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        {/* Kolom 1: Daftar Tunggakan Aktif */}
+        <div className="bg-white border border-gray-300 rounded shadow-sm flex flex-col">
+          <div className="bg-gray-100 px-4 py-3 border-b border-gray-300 font-semibold text-gray-700 flex justify-between items-center">
+            <div className="flex items-center gap-2"><AlertCircle size={16} className="text-yellow-600"/> Daftar Tunggakan</div>
+            <span className="bg-yellow-500 text-white text-xs px-2 py-1 rounded">{stats.unpaidList.length}</span>
+          </div>
+          <div className="p-0 overflow-y-auto h-72">
+            <ul className="divide-y divide-gray-200 m-0">
+              {stats.unpaidList.length > 0 ? stats.unpaidList.map((item, i) => (
+                <li key={i} className="px-4 py-3 hover:bg-gray-50 transition-colors flex justify-between items-center gap-2">
+                  <div>
+                    <p className="font-semibold text-sm text-gray-800 uppercase truncate max-w-[150px] sm:max-w-[200px] lg:max-w-[120px]">{item.NamaSiswa}</p>
+                    <p className="text-xs text-gray-500">{item.Tanggal} • {item.Kategori}</p>
+                  </div>
+                  <span className="font-bold text-red-600 text-sm whitespace-nowrap">Rp {Number(item.Nominal).toLocaleString('id-ID')}</span>
+                </li>
+              )) : <li className="p-6 text-center text-gray-500 text-sm">Semua anggota bebas tunggakan.</li>}
+            </ul>
+          </div>
+        </div>
+
+        {/* Kolom 2: Detail Pemasukan */}
+        <div className="bg-white border border-gray-300 rounded shadow-sm flex flex-col">
+          <div className="bg-gray-100 px-4 py-3 border-b border-gray-300 font-semibold text-gray-700 flex justify-between items-center">
+            <div className="flex items-center gap-2"><TrendingUp size={16} className="text-green-600"/> Detail Pemasukan</div>
+            <span className="bg-green-600 text-white text-xs px-2 py-1 rounded">{stats.paidList.length}</span>
+          </div>
+          <div className="p-0 overflow-y-auto h-72">
+            <ul className="divide-y divide-gray-200 m-0">
+              {stats.paidList.length > 0 ? stats.paidList.map((item, i) => (
+                <li key={i} className="px-4 py-3 hover:bg-gray-50 transition-colors flex justify-between items-center gap-2">
+                  <div>
+                    <p className="font-semibold text-sm text-gray-800 uppercase truncate max-w-[150px] sm:max-w-[200px] lg:max-w-[120px]">{item.NamaSiswa}</p>
+                    <p className="text-xs text-gray-500">{item.Tanggal} • {item.Kategori}</p>
+                  </div>
+                  <span className="font-bold text-green-600 text-sm whitespace-nowrap">+ Rp {Number(item.Nominal).toLocaleString('id-ID')}</span>
+                </li>
+              )) : <li className="p-6 text-center text-gray-500 text-sm">Belum ada dana masuk.</li>}
+            </ul>
+          </div>
+        </div>
+
+        {/* Kolom 3: Detail Pengeluaran */}
+        <div className="bg-white border border-gray-300 rounded shadow-sm flex flex-col">
+          <div className="bg-gray-100 px-4 py-3 border-b border-gray-300 font-semibold text-gray-700 flex justify-between items-center">
+            <div className="flex items-center gap-2"><TrendingDown size={16} className="text-red-600"/> Detail Pengeluaran</div>
+            <span className="bg-red-600 text-white text-xs px-2 py-1 rounded">{stats.expenseList.length}</span>
+          </div>
+          <div className="p-0 overflow-y-auto h-72">
+            <ul className="divide-y divide-gray-200 m-0">
+              {stats.expenseList.length > 0 ? stats.expenseList.map((item, i) => (
+                <li key={i} className="px-4 py-3 hover:bg-gray-50 transition-colors flex justify-between items-center gap-2">
+                  <div>
+                    <p className="font-semibold text-sm text-gray-800 uppercase truncate max-w-[150px] sm:max-w-[200px] lg:max-w-[120px]">{item.Deskripsi}</p>
+                    <p className="text-xs text-gray-500">{item.Tanggal} • {item.Kategori}</p>
+                  </div>
+                  <span className="font-bold text-red-600 text-sm whitespace-nowrap">- Rp {Number(item.Nominal).toLocaleString('id-ID')}</span>
+                </li>
+              )) : <li className="p-6 text-center text-gray-500 text-sm">Belum ada pengeluaran tercatat.</li>}
+            </ul>
+          </div>
+        </div>
+
       </div>
     </div>
   );
@@ -835,7 +1093,7 @@ function UserManagementView({ users, onPost }) {
 function ContentRouter({ view, user, data, actions }) {
   const hasAccess = (required) => required.includes(user.role);
   switch (view) {
-    case 'dashboard': return <AdminDashboardView data={data} />;
+    case 'dashboard': return <AdminDashboardView data={data} user={user} actions={actions} />;
     case 'attendance-input': return hasAccess([ROLES.SEKRETARIS]) ? <AttendanceInputView students={data.students} onPost={actions.genericPost} showToast={actions.showToast} /> : <AccessDenied />;
     case 'income-input': return hasAccess([ROLES.BENDAHARA]) ? <IncomeInputView onPost={actions.genericPost} /> : <AccessDenied />;
     case 'finance': return hasAccess([ROLES.ADMIN, ROLES.BENDAHARA]) ? <FinanceView data={data.finance} user={user} onPost={actions.genericPost} /> : <AccessDenied />;
@@ -843,7 +1101,7 @@ function ContentRouter({ view, user, data, actions }) {
     case 'attendance-recap': return <AttendanceRecapView history={data.history} onPost={actions.genericPost} />;
     case 'users': return user.role === ROLES.ADMIN ? <StudentListView students={data.students} onPost={actions.genericPost} /> : <GenericTable title="Daftar Anggota" headers={['NamaLengkap','Kelas']} rows={data.students} />;
     case 'user-mgmt': return hasAccess([ROLES.ADMIN]) ? <UserManagementView users={data.appUsers} onPost={actions.genericPost} /> : <AccessDenied />;
-    default: return <AdminDashboardView data={data} />;
+    default: return <AdminDashboardView data={data} user={user} actions={actions} />;
   }
 }
 
