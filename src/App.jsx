@@ -48,39 +48,51 @@ function AppLogo({ className, fallbackSize = 24 }) {
 
 // === 1. HALAMAN DASHBOARD PUBLIK ===
 function PublicDashboard({ data, onLoginClick, loading }) {
-  const [detailView, setDetailView] = useState(null); // null, 'Hadir', 'Alpha', 'Sakit', 'Izin'
+  const [detailView, setDetailView] = useState(null);
   
-  // Membaca URL parameter agar bisa langsung membuka modal Tunggakan jika link khusus diklik
   const initialFinanceView = new URLSearchParams(window.location.search).get('view') === 'tunggakan' ? 'Tunggakan' : null;
-  const [financeDetailView, setFinanceDetailView] = useState(initialFinanceView); // null, 'Pemasukan', 'Pengeluaran', 'Tunggakan'
+  const [financeDetailView, setFinanceDetailView] = useState(initialFinanceView); 
 
   const stats = useMemo(() => {
     const incList = data.finance.filter(f => f.Status === 'Lunas');
     const debtList = data.finance.filter(f => f.Status === 'Belum Lunas');
+    
+    // Semua Pemasukan di luar denda masuk KAS
+    const incDendaList = incList.filter(f => String(f.Kategori).toLowerCase().includes('denda'));
+    const incKasList = incList.filter(f => !String(f.Kategori).toLowerCase().includes('denda'));
+
+    const incKas = incKasList.reduce((a,b) => a+Number(b.Nominal), 0);
+    const incDenda = incDendaList.reduce((a,b) => a+Number(b.Nominal), 0);
     const inc = incList.reduce((a,b) => a+Number(b.Nominal), 0);
     const exp = data.expenses.reduce((a,b) => a+Number(b.Nominal), 0);
+
+    // Pemisahan Tunggakan Kas vs Denda
+    const debtDendaList = debtList.filter(f => String(f.Kategori).toLowerCase().includes('denda'));
+    const debtKasList = debtList.filter(f => !String(f.Kategori).toLowerCase().includes('denda'));
+    const debtKas = debtKasList.reduce((a,b) => a+Number(b.Nominal), 0);
+    const debtDenda = debtDendaList.reduce((a,b) => a+Number(b.Nominal), 0);
+    const debt = debtList.reduce((a,b) => a+Number(b.Nominal), 0);
+    
     return { 
-      inc, exp, bal: inc - exp, 
+      inc, incKas, incDenda, exp, bal: inc - exp, debt, debtKas, debtDenda,
       incCount: incList.length, 
+      incKasCount: incKasList.length,
+      incDendaCount: incDendaList.length,
       debtCount: debtList.length, 
+      debtKasCount: debtKasList.length,
+      debtDendaCount: debtDendaList.length,
       expCount: data.expenses.length,
-      incList,
-      debtList,
-      expList: data.expenses
+      incList, incKasList, incDendaList,
+      unpaidList: debtList, debtKasList, debtDendaList, expList: data.expenses
     };
   }, [data.finance, data.expenses]);
 
   const latestAttendance = useMemo(() => {
     if (!data.history || data.history.length === 0) return null;
-    // Mengambil kegiatan teratas (terbaru)
     const latest = data.history[0];
-    // Memfilter semua data yang masuk di kegiatan & tanggal yang sama
     const records = data.history.filter(h => h.Tanggal === latest.Tanggal && h.Kegiatan === latest.Kegiatan);
-    
     return {
-      tanggal: latest.Tanggal,
-      kegiatan: latest.Kegiatan,
-      waktu: latest.Waktu,
+      tanggal: latest.Tanggal, kegiatan: latest.Kegiatan, waktu: latest.Waktu,
       grouped: {
         Hadir: records.filter(r => r.Status === 'Hadir'),
         Sakit: records.filter(r => r.Status === 'Sakit'),
@@ -123,42 +135,15 @@ function PublicDashboard({ data, onLoginClick, loading }) {
            </div>
         ) : (
           <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Saldo Kas */}
-              <div className="bg-white border border-gray-300 rounded shadow-sm flex flex-col">
-                <div className="bg-gray-100 px-4 py-3 border-b border-gray-300 font-semibold text-gray-700 flex justify-between">
-                  Saldo Kas <Wallet size={18} className="text-gray-500"/>
-                </div>
-                <div className="p-5 flex-1">
-                  <h2 className="text-3xl font-bold text-gray-800">Rp {stats.bal.toLocaleString('id-ID')}</h2>
-                </div>
-              </div>
-              
-              {/* Pemasukan */}
-              <div className="bg-white border border-gray-300 rounded shadow-sm flex flex-col">
-                <div className="bg-gray-100 px-4 py-3 border-b border-gray-300 font-semibold text-gray-700 flex justify-between">
-                  Pemasukan <TrendingUp size={18} className="text-green-600"/>
-                </div>
-                <div className="p-5 flex-1">
-                  <h2 className="text-3xl font-bold text-green-600">Rp {stats.inc.toLocaleString('id-ID')}</h2>
-                </div>
-                <button onClick={() => setFinanceDetailView('Pemasukan')} className="bg-gray-50 border-t border-gray-200 text-xs font-semibold text-gray-600 py-2.5 hover:bg-gray-200 transition-colors flex justify-center items-center gap-1 w-full rounded-b">
-                  <Search size={14}/> Lihat Detail Pemasukan
-                </button>
-              </div>
-
-              {/* Pengeluaran */}
-              <div className="bg-white border border-gray-300 rounded shadow-sm flex flex-col">
-                <div className="bg-gray-100 px-4 py-3 border-b border-gray-300 font-semibold text-gray-700 flex justify-between">
-                  Pengeluaran <TrendingDown size={18} className="text-red-600"/>
-                </div>
-                <div className="p-5 flex-1">
-                  <h2 className="text-3xl font-bold text-red-600">Rp {stats.exp.toLocaleString('id-ID')}</h2>
-                </div>
-                <button onClick={() => setFinanceDetailView('Pengeluaran')} className="bg-gray-50 border-t border-gray-200 text-xs font-semibold text-gray-600 py-2.5 hover:bg-gray-200 transition-colors flex justify-center items-center gap-1 w-full rounded-b">
-                  <Search size={14}/> Lihat Detail Pengeluaran
-                </button>
-              </div>
+            
+            {/* GRID KARTU KEUANGAN TERPISAH KAS DAN DENDA */}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+              <StatCard label="Saldo Kas" val={stats.bal} color="blue" icon={<Wallet size={16}/>} />
+              <StatCard label="Masuk (Kas)" val={stats.incKas} color="green" icon={<TrendingUp size={16}/>} onClickDetail={() => setFinanceDetailView('Pemasukan Kas')} />
+              <StatCard label="Masuk (Denda)" val={stats.incDenda} color="green" icon={<Coins size={16}/>} onClickDetail={() => setFinanceDetailView('Pemasukan Denda')} />
+              <StatCard label="Tunggakan (Kas)" val={stats.debtKas} color="orange" icon={<AlertCircle size={16}/>} onClickDetail={() => setFinanceDetailView('Tunggakan Kas')} />
+              <StatCard label="Tunggakan (Denda)" val={stats.debtDenda} color="red" icon={<AlertCircle size={16}/>} onClickDetail={() => setFinanceDetailView('Tunggakan Denda')} />
+              <StatCard label="Pengeluaran" val={stats.exp} color="red" icon={<TrendingDown size={16}/>} onClickDetail={() => setFinanceDetailView('Pengeluaran')} />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -207,25 +192,39 @@ function PublicDashboard({ data, onLoginClick, loading }) {
                 <div className="bg-gray-100 px-4 py-3 border-b border-gray-300 font-semibold flex items-center gap-2">
                   <Receipt size={18} className="text-gray-600"/> Rincian Total Transaksi
                 </div>
-                <div className="p-4 flex-1">
+                <div className="p-4 flex-1 overflow-y-auto">
                    <p className="text-sm text-gray-600 mb-4">Berikut adalah rincian jumlah pencatatan keuangan. <span className="font-semibold text-blue-600">Klik baris untuk melihat detailnya:</span></p>
                    <ul className="list-none border border-gray-200 rounded p-0 m-0">
-                      <li onClick={() => setFinanceDetailView('Pemasukan')} className="border-b border-gray-200 px-4 py-3 flex justify-between items-center bg-gray-50 cursor-pointer hover:bg-blue-50 transition-colors">
-                        <span className="font-medium text-gray-700">Dana Masuk (Telah Lunas)</span>
+                      <li onClick={() => setFinanceDetailView('Pemasukan Kas')} className="border-b border-gray-200 px-4 py-3 flex justify-between items-center bg-gray-50 cursor-pointer hover:bg-blue-50 transition-colors">
+                        <span className="font-medium text-gray-700">Dana Kas (Lunas)</span>
                         <div className="flex items-center gap-2">
-                          <span className="bg-green-600 text-white text-xs px-3 py-1 rounded-full">{stats.incCount} Record</span>
+                          <span className="bg-green-600 text-white text-xs px-3 py-1 rounded-full">{stats.incKasCount} Record</span>
                           <Search size={14} className="text-gray-400"/>
                         </div>
                       </li>
-                      <li onClick={() => setFinanceDetailView('Tunggakan')} className="border-b border-gray-200 px-4 py-3 flex justify-between items-center bg-white cursor-pointer hover:bg-blue-50 transition-colors">
-                        <span className="font-medium text-gray-700">Tunggakan Kas / Denda</span>
+                      <li onClick={() => setFinanceDetailView('Pemasukan Denda')} className="border-b border-gray-200 px-4 py-3 flex justify-between items-center bg-white cursor-pointer hover:bg-blue-50 transition-colors">
+                        <span className="font-medium text-gray-700">Dana Denda (Lunas)</span>
                         <div className="flex items-center gap-2">
-                          <span className="bg-yellow-500 text-white text-xs px-3 py-1 rounded-full">{stats.debtCount} Record</span>
+                          <span className="bg-green-600 text-white text-xs px-3 py-1 rounded-full">{stats.incDendaCount} Record</span>
+                          <Search size={14} className="text-gray-400"/>
+                        </div>
+                      </li>
+                      <li onClick={() => setFinanceDetailView('Tunggakan Kas')} className="border-b border-gray-200 px-4 py-3 flex justify-between items-center bg-gray-50 cursor-pointer hover:bg-blue-50 transition-colors">
+                        <span className="font-medium text-gray-700">Tunggakan Kas</span>
+                        <div className="flex items-center gap-2">
+                          <span className="bg-orange-500 text-white text-xs px-3 py-1 rounded-full">{stats.debtKasCount} Record</span>
+                          <Search size={14} className="text-gray-400"/>
+                        </div>
+                      </li>
+                      <li onClick={() => setFinanceDetailView('Tunggakan Denda')} className="border-b border-gray-200 px-4 py-3 flex justify-between items-center bg-white cursor-pointer hover:bg-blue-50 transition-colors">
+                        <span className="font-medium text-gray-700">Tunggakan Denda</span>
+                        <div className="flex items-center gap-2">
+                          <span className="bg-red-500 text-white text-xs px-3 py-1 rounded-full">{stats.debtDendaCount} Record</span>
                           <Search size={14} className="text-gray-400"/>
                         </div>
                       </li>
                       <li onClick={() => setFinanceDetailView('Pengeluaran')} className="px-4 py-3 flex justify-between items-center bg-gray-50 cursor-pointer hover:bg-blue-50 transition-colors">
-                        <span className="font-medium text-gray-700">Log Pengeluaran Organisasi</span>
+                        <span className="font-medium text-gray-700">Log Pengeluaran</span>
                         <div className="flex items-center gap-2">
                           <span className="bg-red-600 text-white text-xs px-3 py-1 rounded-full">{stats.expCount} Record</span>
                           <Search size={14} className="text-gray-400"/>
@@ -248,16 +247,13 @@ function PublicDashboard({ data, onLoginClick, loading }) {
                     <p className="text-sm text-gray-500">Rincian data {financeDetailView.toLowerCase()} organisasi</p>
                   </div>
                   <button onClick={() => {
-                    // Reset URL parameters jika ada, saat menutup modal
-                    if (window.history.replaceState) {
-                       window.history.replaceState(null, '', window.location.pathname);
-                    }
+                    if (window.history.replaceState) window.history.replaceState(null, '', window.location.pathname);
                     setFinanceDetailView(null);
                   }} className="text-gray-500 hover:text-red-600 transition-colors bg-white hover:bg-red-50 p-1.5 rounded border border-transparent hover:border-red-200"><X size={20}/></button>
                </div>
                <div className="p-0 overflow-y-auto flex-1 bg-gray-50">
                   <ul className="divide-y divide-gray-200 m-0">
-                    {financeDetailView === 'Pemasukan' && stats.incList.length > 0 ? stats.incList.map((item, i) => (
+                    {financeDetailView === 'Pemasukan Kas' && stats.incKasList.length > 0 ? stats.incKasList.map((item, i) => (
                       <li key={i} className="px-5 py-3 bg-white hover:bg-gray-50 transition-colors flex justify-between items-center gap-2">
                         <div>
                           <p className="font-semibold text-sm text-gray-800 uppercase">{item.NamaSiswa}</p>
@@ -265,9 +261,39 @@ function PublicDashboard({ data, onLoginClick, loading }) {
                         </div>
                         <span className="font-bold text-green-600 text-sm whitespace-nowrap">+ Rp {Number(item.Nominal).toLocaleString('id-ID')}</span>
                       </li>
-                    )) : financeDetailView === 'Pemasukan' && <li className="p-8 text-center text-gray-500 text-sm">Belum ada data pemasukan.</li>}
+                    )) : financeDetailView === 'Pemasukan Kas' && <li className="p-8 text-center text-gray-500 text-sm">Belum ada data uang kas masuk.</li>}
 
-                    {financeDetailView === 'Tunggakan' && stats.debtList.length > 0 ? stats.debtList.map((item, i) => (
+                    {financeDetailView === 'Pemasukan Denda' && stats.incDendaList.length > 0 ? stats.incDendaList.map((item, i) => (
+                      <li key={i} className="px-5 py-3 bg-white hover:bg-gray-50 transition-colors flex justify-between items-center gap-2">
+                        <div>
+                          <p className="font-semibold text-sm text-gray-800 uppercase">{item.NamaSiswa}</p>
+                          <p className="text-xs text-gray-500">{item.Tanggal} • {item.Kategori}</p>
+                        </div>
+                        <span className="font-bold text-green-600 text-sm whitespace-nowrap">+ Rp {Number(item.Nominal).toLocaleString('id-ID')}</span>
+                      </li>
+                    )) : financeDetailView === 'Pemasukan Denda' && <li className="p-8 text-center text-gray-500 text-sm">Belum ada data uang denda masuk.</li>}
+
+                    {financeDetailView === 'Tunggakan Kas' && stats.debtKasList.length > 0 ? stats.debtKasList.map((item, i) => (
+                      <li key={i} className="px-5 py-3 bg-white hover:bg-gray-50 transition-colors flex justify-between items-center gap-2">
+                        <div>
+                          <p className="font-semibold text-sm text-gray-800 uppercase">{item.NamaSiswa}</p>
+                          <p className="text-xs text-gray-500">{item.Tanggal} • {item.Kategori}</p>
+                        </div>
+                        <span className="font-bold text-orange-500 text-sm whitespace-nowrap">Rp {Number(item.Nominal).toLocaleString('id-ID')}</span>
+                      </li>
+                    )) : financeDetailView === 'Tunggakan Kas' && <li className="p-8 text-center text-gray-500 text-sm">Semua anggota bebas tunggakan kas.</li>}
+
+                    {financeDetailView === 'Tunggakan Denda' && stats.debtDendaList.length > 0 ? stats.debtDendaList.map((item, i) => (
+                      <li key={i} className="px-5 py-3 bg-white hover:bg-gray-50 transition-colors flex justify-between items-center gap-2">
+                        <div>
+                          <p className="font-semibold text-sm text-gray-800 uppercase">{item.NamaSiswa}</p>
+                          <p className="text-xs text-gray-500">{item.Tanggal} • {item.Kategori}</p>
+                        </div>
+                        <span className="font-bold text-red-600 text-sm whitespace-nowrap">Rp {Number(item.Nominal).toLocaleString('id-ID')}</span>
+                      </li>
+                    )) : financeDetailView === 'Tunggakan Denda' && <li className="p-8 text-center text-gray-500 text-sm">Semua anggota bebas tunggakan denda.</li>}
+
+                    {financeDetailView === 'Tunggakan' && stats.unpaidList.length > 0 ? stats.unpaidList.map((item, i) => (
                       <li key={i} className="px-5 py-3 bg-white hover:bg-gray-50 transition-colors flex justify-between items-center gap-2">
                         <div>
                           <p className="font-semibold text-sm text-gray-800 uppercase">{item.NamaSiswa}</p>
@@ -385,17 +411,28 @@ function LoginScreen({ onLogin, onBack, loginError }) {
   );
 }
 
-function StatCard({ label, val, color, icon }) {
+function StatCard({ label, val, color, icon, onClickDetail, detailLabel }) {
   const colors = { 
     green: 'border-green-500 text-green-700', 
     red: 'border-red-500 text-red-700', 
     blue: 'border-blue-500 text-blue-700', 
-    orange: 'border-yellow-500 text-yellow-700' 
+    orange: 'border-orange-500 text-orange-700',
+    yellow: 'border-yellow-500 text-yellow-700'
   };
   return (
-    <div className={`bg-white rounded border border-gray-300 shadow-sm p-4 border-l-4 ${colors[color]}`}>
-      <div className="flex justify-between items-start mb-2"><p className="text-xs font-semibold text-gray-500 uppercase">{label}</p><div>{icon}</div></div>
-      <h2 className="text-xl font-bold text-gray-800">Rp {val.toLocaleString('id-ID')}</h2>
+    <div className={`bg-white rounded border border-gray-300 shadow-sm flex flex-col overflow-hidden border-l-4 ${colors[color] || colors.blue}`}>
+      <div className="p-4 flex-1">
+        <div className="flex justify-between items-start mb-2">
+          <p className="text-[11px] sm:text-xs font-semibold text-gray-500 uppercase">{label}</p>
+          <div className={colors[color] ? colors[color].split(' ')[1] : 'text-gray-500'}>{icon}</div>
+        </div>
+        <h2 className="text-lg sm:text-xl font-bold text-gray-800">Rp {val.toLocaleString('id-ID')}</h2>
+      </div>
+      {onClickDetail && (
+        <button onClick={onClickDetail} className="bg-gray-50 border-t border-gray-200 text-[10px] sm:text-xs font-semibold text-gray-600 py-2 hover:bg-gray-200 transition-colors flex justify-center items-center gap-1 w-full">
+          <Search size={12}/> {detailLabel || 'Detail'}
+        </button>
+      )}
     </div>
   );
 }
@@ -526,40 +563,47 @@ function AdminDashboardView({ data, user, actions }) {
   const stats = useMemo(() => {
     const incList = data.finance.filter(f => f.Status === 'Lunas');
     const debtList = data.finance.filter(f => f.Status === 'Belum Lunas');
+    
+    // Pisahkan Uang Kas dan Denda
+    const incDendaList = incList.filter(f => String(f.Kategori).toLowerCase().includes('denda'));
+    const incKasList = incList.filter(f => !String(f.Kategori).toLowerCase().includes('denda'));
+
+    const incKas = incKasList.reduce((a,b) => a+Number(b.Nominal), 0);
+    const incDenda = incDendaList.reduce((a,b) => a+Number(b.Nominal), 0);
     const inc = incList.reduce((a,b) => a+Number(b.Nominal), 0);
     const exp = data.expenses.reduce((a,b) => a+Number(b.Nominal), 0);
+
+    const debtDendaList = debtList.filter(f => String(f.Kategori).toLowerCase().includes('denda'));
+    const debtKasList = debtList.filter(f => !String(f.Kategori).toLowerCase().includes('denda'));
+    const debtKas = debtKasList.reduce((a,b) => a+Number(b.Nominal), 0);
+    const debtDenda = debtDendaList.reduce((a,b) => a+Number(b.Nominal), 0);
     const debt = debtList.reduce((a,b) => a+Number(b.Nominal), 0);
+    
     const chartData = [
-      { name: 'Pemasukan', value: inc },
+      { name: 'Kas Masuk', value: incKas },
+      { name: 'Denda Masuk', value: incDenda },
       { name: 'Pengeluaran', value: exp },
       { name: 'Piutang', value: debt }
     ];
     return { 
-      inc, exp, debt, bal: inc - exp, chartData, 
+      inc, incKas, incDenda, exp, debt, debtKas, debtDenda, bal: inc - exp, chartData, 
       incCount: incList.length, debtCount: debtList.length, expCount: data.expenses.length,
+      incKasCount: incKasList.length, incDendaCount: incDendaList.length,
+      debtKasCount: debtKasList.length, debtDendaCount: debtDendaList.length,
       unpaidList: debtList, paidList: incList, expenseList: data.expenses 
     };
   }, [data]);
 
   const handleShareReport = async () => {
     const dateStr = new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-    
-    // Mengambil URL website saat ini secara otomatis
     const baseUrl = window.location.origin + window.location.pathname;
     const webLink = baseUrl; 
     const tunggakanLink = `${baseUrl}?view=tunggakan`;
 
-    const reportText = `*📊 LAPORAN KEUANGAN PMR SMANEL*\nTanggal: ${dateStr}\n\n*💰 RINGKASAN KAS:*\n🟢 Total Pemasukan: Rp ${stats.inc.toLocaleString('id-ID')}\n🔴 Total Pengeluaran: Rp ${stats.exp.toLocaleString('id-ID')}\n🔵 *Saldo Akhir Aktif: Rp ${stats.bal.toLocaleString('id-ID')}*\n\n*📝 RINCIAN TAGIHAN & DENDA:*\n- Total Tunggakan Terbuka: Rp ${stats.debt.toLocaleString('id-ID')} (${stats.debtCount} Tagihan)\n- Pengeluaran Tercatat: ${stats.expCount} Item\n\n*🔗 LINK AKSES ANGGOTA:*\n\n1️⃣ *Cek Daftar Tunggakan Langsung:*\n👉 ${tunggakanLink}\n\n2️⃣ *Dashboard Utama (Transparansi):*\n👉 ${webLink}\n\nMohon bagi anggota yang masih memiliki tunggakan kas atau denda untuk segera menyelesaikannya. Terima kasih! 🙏\n\n_Sistem Manajemen PMR SMANEL_`;
+    const reportText = `*📊 LAPORAN KEUANGAN PMR SMANEL*\nTanggal: ${dateStr}\n\n*💰 RINGKASAN KAS:*\n🟢 Pemasukan Uang Kas: Rp ${stats.incKas.toLocaleString('id-ID')}\n🟠 Pemasukan Denda: Rp ${stats.incDenda.toLocaleString('id-ID')}\n🔴 Total Pengeluaran: Rp ${stats.exp.toLocaleString('id-ID')}\n🔵 *Saldo Akhir Aktif: Rp ${stats.bal.toLocaleString('id-ID')}*\n\n*📝 RINCIAN TAGIHAN & DENDA:*\n- Tunggakan Kas: Rp ${stats.debtKas.toLocaleString('id-ID')} (${stats.debtKasCount} Tagihan)\n- Tunggakan Denda: Rp ${stats.debtDenda.toLocaleString('id-ID')} (${stats.debtDendaCount} Tagihan)\n- Pengeluaran Tercatat: ${stats.expCount} Item\n\n*🔗 LINK AKSES ANGGOTA:*\n\n1️⃣ *Cek Daftar Tunggakan Langsung:*\n👉 ${tunggakanLink}\n\n2️⃣ *Dashboard Utama (Transparansi):*\n👉 ${webLink}\n\nMohon bagi anggota yang masih memiliki tunggakan kas atau denda untuk segera menyelesaikannya. Terima kasih! 🙏\n\n_Sistem Manajemen PMR SMANEL_`;
 
     if (navigator.share) {
-      try {
-        await navigator.share({
-          title: 'Laporan Keuangan PMR',
-          text: reportText,
-        });
-      } catch (error) {
-        console.log('User membatalkan share', error);
-      }
+      try { await navigator.share({ title: 'Laporan Keuangan PMR', text: reportText }); } catch (error) { console.log('Batal', error); }
     } else {
       try {
         await navigator.clipboard.writeText(reportText);
@@ -572,7 +616,6 @@ function AdminDashboardView({ data, user, actions }) {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Header dengan Tombol Share */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <h2 className="text-xl font-bold text-gray-800">Ikhtisar Sistem</h2>
         {(user?.role === ROLES.ADMIN || user?.role === ROLES.BENDAHARA) && (
@@ -582,12 +625,15 @@ function AdminDashboardView({ data, user, actions }) {
         )}
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Total Pemasukan" val={stats.inc} color="green" icon={<TrendingUp size={16}/>} />
-        <StatCard label="Total Pengeluaran" val={stats.exp} color="red" icon={<TrendingDown size={16}/>} />
-        <StatCard label="Saldo Kas Aktif" val={stats.bal} color="blue" icon={<Wallet size={16}/>} />
-        <StatCard label="Piutang Terbuka" val={stats.debt} color="orange" icon={<AlertCircle size={16}/>} />
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        <StatCard label="Saldo Kas" val={stats.bal} color="blue" icon={<Wallet size={16}/>} />
+        <StatCard label="Masuk (Kas)" val={stats.incKas} color="green" icon={<TrendingUp size={16}/>} />
+        <StatCard label="Masuk (Denda)" val={stats.incDenda} color="green" icon={<Coins size={16}/>} />
+        <StatCard label="Tunggakan (Kas)" val={stats.debtKas} color="orange" icon={<AlertCircle size={16}/>} />
+        <StatCard label="Tunggakan (Denda)" val={stats.debtDenda} color="red" icon={<AlertCircle size={16}/>} />
+        <StatCard label="Pengeluaran" val={stats.exp} color="red" icon={<TrendingDown size={16}/>} />
       </div>
+      
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white border border-gray-300 rounded shadow-sm">
           <div className="bg-gray-100 px-4 py-3 border-b border-gray-300 font-semibold text-gray-700">Diagram Keuangan</div>
@@ -613,12 +659,20 @@ function AdminDashboardView({ data, user, actions }) {
           <div className="p-4 flex-1">
              <ul className="list-none border border-gray-300 rounded p-0 m-0">
                 <li className="border-b border-gray-300 px-4 py-3 flex justify-between items-center bg-white hover:bg-gray-50">
-                  <span className="font-medium text-gray-700">Pemasukan Kas (Lunas)</span>
-                  <span className="bg-green-600 text-white text-xs px-2 py-1 rounded">{stats.incCount} Record</span>
+                  <span className="font-medium text-gray-700">Uang Kas Masuk</span>
+                  <span className="bg-green-600 text-white text-xs px-2 py-1 rounded">{stats.incKasCount} Record</span>
                 </li>
                 <li className="border-b border-gray-300 px-4 py-3 flex justify-between items-center bg-white hover:bg-gray-50">
-                  <span className="font-medium text-gray-700">Tunggakan (Belum Lunas)</span>
-                  <span className="bg-yellow-500 text-white text-xs px-2 py-1 rounded">{stats.debtCount} Record</span>
+                  <span className="font-medium text-gray-700">Uang Denda Masuk</span>
+                  <span className="bg-green-600 text-white text-xs px-2 py-1 rounded">{stats.incDendaCount} Record</span>
+                </li>
+                <li className="border-b border-gray-300 px-4 py-3 flex justify-between items-center bg-white hover:bg-gray-50">
+                  <span className="font-medium text-gray-700">Tunggakan Kas</span>
+                  <span className="bg-orange-500 text-white text-xs px-2 py-1 rounded">{stats.debtKasCount} Record</span>
+                </li>
+                <li className="border-b border-gray-300 px-4 py-3 flex justify-between items-center bg-white hover:bg-gray-50">
+                  <span className="font-medium text-gray-700">Tunggakan Denda</span>
+                  <span className="bg-red-500 text-white text-xs px-2 py-1 rounded">{stats.debtDendaCount} Record</span>
                 </li>
                 <li className="px-4 py-3 flex justify-between items-center bg-white hover:bg-gray-50">
                   <span className="font-medium text-gray-700">Pengeluaran Operasional</span>
@@ -630,74 +684,6 @@ function AdminDashboardView({ data, user, actions }) {
              </div>
           </div>
         </div>
-      </div>
-
-      {/* --- TAMBAHAN: RINCIAN DETAIL TRANSAKSI UNTUK LAPORAN BENDAHARA --- */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* Kolom 1: Daftar Tunggakan Aktif */}
-        <div className="bg-white border border-gray-300 rounded shadow-sm flex flex-col">
-          <div className="bg-gray-100 px-4 py-3 border-b border-gray-300 font-semibold text-gray-700 flex justify-between items-center">
-            <div className="flex items-center gap-2"><AlertCircle size={16} className="text-yellow-600"/> Daftar Tunggakan</div>
-            <span className="bg-yellow-500 text-white text-xs px-2 py-1 rounded">{stats.unpaidList.length}</span>
-          </div>
-          <div className="p-0 overflow-y-auto h-72">
-            <ul className="divide-y divide-gray-200 m-0">
-              {stats.unpaidList.length > 0 ? stats.unpaidList.map((item, i) => (
-                <li key={i} className="px-4 py-3 hover:bg-gray-50 transition-colors flex justify-between items-center gap-2">
-                  <div>
-                    <p className="font-semibold text-sm text-gray-800 uppercase truncate max-w-[150px] sm:max-w-[200px] lg:max-w-[120px]">{item.NamaSiswa}</p>
-                    <p className="text-xs text-gray-500">{item.Tanggal} • {item.Kategori}</p>
-                  </div>
-                  <span className="font-bold text-red-600 text-sm whitespace-nowrap">Rp {Number(item.Nominal).toLocaleString('id-ID')}</span>
-                </li>
-              )) : <li className="p-6 text-center text-gray-500 text-sm">Semua anggota bebas tunggakan.</li>}
-            </ul>
-          </div>
-        </div>
-
-        {/* Kolom 2: Detail Pemasukan */}
-        <div className="bg-white border border-gray-300 rounded shadow-sm flex flex-col">
-          <div className="bg-gray-100 px-4 py-3 border-b border-gray-300 font-semibold text-gray-700 flex justify-between items-center">
-            <div className="flex items-center gap-2"><TrendingUp size={16} className="text-green-600"/> Detail Pemasukan</div>
-            <span className="bg-green-600 text-white text-xs px-2 py-1 rounded">{stats.paidList.length}</span>
-          </div>
-          <div className="p-0 overflow-y-auto h-72">
-            <ul className="divide-y divide-gray-200 m-0">
-              {stats.paidList.length > 0 ? stats.paidList.map((item, i) => (
-                <li key={i} className="px-4 py-3 hover:bg-gray-50 transition-colors flex justify-between items-center gap-2">
-                  <div>
-                    <p className="font-semibold text-sm text-gray-800 uppercase truncate max-w-[150px] sm:max-w-[200px] lg:max-w-[120px]">{item.NamaSiswa}</p>
-                    <p className="text-xs text-gray-500">{item.Tanggal} • {item.Kategori}</p>
-                  </div>
-                  <span className="font-bold text-green-600 text-sm whitespace-nowrap">+ Rp {Number(item.Nominal).toLocaleString('id-ID')}</span>
-                </li>
-              )) : <li className="p-6 text-center text-gray-500 text-sm">Belum ada dana masuk.</li>}
-            </ul>
-          </div>
-        </div>
-
-        {/* Kolom 3: Detail Pengeluaran */}
-        <div className="bg-white border border-gray-300 rounded shadow-sm flex flex-col">
-          <div className="bg-gray-100 px-4 py-3 border-b border-gray-300 font-semibold text-gray-700 flex justify-between items-center">
-            <div className="flex items-center gap-2"><TrendingDown size={16} className="text-red-600"/> Detail Pengeluaran</div>
-            <span className="bg-red-600 text-white text-xs px-2 py-1 rounded">{stats.expenseList.length}</span>
-          </div>
-          <div className="p-0 overflow-y-auto h-72">
-            <ul className="divide-y divide-gray-200 m-0">
-              {stats.expenseList.length > 0 ? stats.expenseList.map((item, i) => (
-                <li key={i} className="px-4 py-3 hover:bg-gray-50 transition-colors flex justify-between items-center gap-2">
-                  <div>
-                    <p className="font-semibold text-sm text-gray-800 uppercase truncate max-w-[150px] sm:max-w-[200px] lg:max-w-[120px]">{item.Deskripsi}</p>
-                    <p className="text-xs text-gray-500">{item.Tanggal} • {item.Kategori}</p>
-                  </div>
-                  <span className="font-bold text-red-600 text-sm whitespace-nowrap">- Rp {Number(item.Nominal).toLocaleString('id-ID')}</span>
-                </li>
-              )) : <li className="p-6 text-center text-gray-500 text-sm">Belum ada pengeluaran tercatat.</li>}
-            </ul>
-          </div>
-        </div>
-
       </div>
     </div>
   );
@@ -834,7 +820,6 @@ function FinanceView({ data, user, onPost }) {
   const [confirmMsg, setConfirmMsg] = useState(null); 
   
   const unpaid = useMemo(() => data.filter(f => f.Status === 'Belum Lunas'), [data]);
-  const paid = useMemo(() => data.filter(f => f.Status === 'Lunas'), [data]);
 
   const toggleSelect = (id) => setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   const toggleSelectAll = () => setSelected(selected.length === unpaid.length && unpaid.length > 0 ? [] : unpaid.map(f => f.IDTransaksi));
@@ -853,12 +838,11 @@ function FinanceView({ data, user, onPost }) {
   };
 
   const handleClear = (target) => {
-    const label = target === 'finance_bill' ? 'Tunggakan Aktif' : 'Riwayat Dana Masuk';
     setConfirmMsg({
-      title: "Hapus Semua Data",
-      message: `Anda yakin ingin menghapus semua data ${label}? Tindakan ini tidak bisa dibatalkan.`,
+      title: "Hapus Semua Tunggakan",
+      message: `Anda yakin ingin menghapus semua data Tunggakan Aktif? Tindakan ini tidak bisa dibatalkan.`,
       onConfirm: () => {
-        onPost('clearData', { target }, `Data ${label} berhasil dibersihkan.`);
+        onPost('clearData', { target }, `Data Tunggakan berhasil dibersihkan.`);
         setConfirmMsg(null);
       }
     });
@@ -868,67 +852,44 @@ function FinanceView({ data, user, onPost }) {
     <div className="space-y-4 animate-fade-in">
       {confirmMsg && <ConfirmModal title={confirmMsg.title} message={confirmMsg.message} onConfirm={confirmMsg.onConfirm} onCancel={() => setConfirmMsg(null)} />}
       
-      <ul className="flex border-b border-gray-300">
-        <li className="-mb-px mr-1">
-          <button onClick={() => setTab('billing')} className={`bg-white inline-block py-2 px-4 text-sm font-medium border-l border-t border-r rounded-t ${tab==='billing' ? 'border-gray-300 text-blue-600 bg-gray-50' : 'border-transparent text-gray-500 hover:text-gray-800'}`}>Monitor Tunggakan</button>
-        </li>
-        <li className="mr-1">
-          <button onClick={() => setTab('income')} className={`bg-white inline-block py-2 px-4 text-sm font-medium border-l border-t border-r rounded-t ${tab==='income' ? 'border-gray-300 text-blue-600 bg-gray-50' : 'border-transparent text-gray-500 hover:text-gray-800'}`}>Log Pemasukan</button>
-        </li>
-      </ul>
-
-      {tab === 'billing' && (
-        <div className="bg-white rounded border border-gray-300 shadow-sm overflow-hidden">
-          <div className="bg-gray-100 p-3 border-b border-gray-300 flex justify-between items-center">
-            <h3 className="text-sm font-semibold text-gray-700">Tagihan Aktif ({unpaid.length})</h3>
-            {user.role === ROLES.BENDAHARA && (
-              <div className="flex gap-2">
-                {selected.length > 0 && (
-                  <button onClick={handleBulkPay} className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded text-sm transition-colors flex items-center gap-1 border border-green-700"><CheckSquare size={14}/> Bayar ({selected.length})</button>
-                )}
-                {unpaid.length > 0 && (
-                  <button onClick={() => handleClear('finance_bill')} className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded text-sm transition-colors flex items-center gap-1 border border-red-700"><Trash2 size={14}/> Clear Data</button>
-                )}
-              </div>
-            )}
-          </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-left text-sm whitespace-nowrap">
-              <thead><tr className="bg-white border-b border-gray-300 text-gray-700">
-                <th className="px-4 py-3 w-10 text-center"><input type="checkbox" checked={unpaid.length > 0 && selected.length === unpaid.length} onChange={toggleSelectAll} className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"/></th>
-                <th className="px-4 py-3 font-semibold">Anggota</th>
-                <th className="px-4 py-3 font-semibold">Keterangan Kehadiran</th>
-                <th className="px-4 py-3 text-right font-semibold">Nominal</th>
-                <th className="px-4 py-3 text-center font-semibold">Status</th>
-              </tr></thead>
-              <tbody className="divide-y divide-gray-200">
-                {unpaid.map((f, i) => (
-                  <tr key={i} className={`hover:bg-gray-50 transition-colors ${selected.includes(f.IDTransaksi) ? 'bg-blue-50/50' : 'even:bg-gray-50/50'}`}>
-                    <td className="px-4 py-2 text-center"><input type="checkbox" checked={selected.includes(f.IDTransaksi)} onChange={() => toggleSelect(f.IDTransaksi)} className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"/></td>
-                    <td className="px-4 py-2 font-medium text-gray-800">{f.NamaSiswa}<div className="text-xs text-gray-500 font-normal">{f.Tanggal}</div></td>
-                    <td className="px-4 py-2"><span className="bg-yellow-100 text-yellow-800 border border-yellow-200 px-2 py-1 rounded text-xs">{f.Kategori}</span></td>
-                    <td className="px-4 py-2 font-medium text-right text-red-600">Rp {Number(f.Nominal).toLocaleString('id-ID')}</td>
-                    <td className="px-4 py-2 text-center"><span className="text-red-500 font-medium text-xs">Belum Lunas</span></td>
-                  </tr>
-                ))}
-                {unpaid.length === 0 && <tr><td colSpan="5" className="p-8 text-center text-gray-500 text-sm">Tidak ada tunggakan.</td></tr>}
-              </tbody>
-            </table>
-          </div>
+      <div className="bg-white rounded border border-gray-300 shadow-sm overflow-hidden">
+        <div className="bg-gray-100 p-3 border-b border-gray-300 flex justify-between items-center">
+          <h3 className="text-sm font-semibold text-gray-700">Monitor Tunggakan Aktif ({unpaid.length})</h3>
+          {user.role === ROLES.BENDAHARA && (
+            <div className="flex gap-2">
+              {selected.length > 0 && (
+                <button onClick={handleBulkPay} className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded text-sm transition-colors flex items-center gap-1 border border-green-700"><CheckSquare size={14}/> Bayar ({selected.length})</button>
+              )}
+              {unpaid.length > 0 && (
+                <button onClick={() => handleClear('finance_bill')} className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded text-sm transition-colors flex items-center gap-1 border border-red-700"><Trash2 size={14}/> Bersihkan Semua</button>
+              )}
+            </div>
+          )}
         </div>
-      )}
-
-      {tab === 'income' && (
-        <div className="bg-white rounded border border-gray-300 shadow-sm overflow-hidden">
-          <div className="bg-gray-100 p-3 border-b border-gray-300 flex justify-between items-center">
-            <h3 className="text-sm font-semibold text-gray-700">Riwayat Dana Masuk</h3>
-            {user.role === ROLES.BENDAHARA && paid.length > 0 && (
-              <button onClick={() => handleClear('finance_in')} className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded text-sm flex items-center gap-1 border border-red-700"><Trash2 size={14}/> Hapus Semua</button>
-            )}
-          </div>
-          <GenericTableInner headers={['Tanggal','Sumber / Deskripsi','Kategori','Nominal']} rows={paid} />
+        <div className="overflow-x-auto max-h-[600px]">
+          <table className="min-w-full text-left text-sm whitespace-nowrap relative">
+            <thead className="sticky top-0 z-10 bg-white shadow-sm"><tr className="bg-gray-100 border-b border-gray-300 text-gray-700">
+              <th className="px-4 py-3 w-10 text-center"><input type="checkbox" checked={unpaid.length > 0 && selected.length === unpaid.length} onChange={toggleSelectAll} className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"/></th>
+              <th className="px-4 py-3 font-semibold">Anggota</th>
+              <th className="px-4 py-3 font-semibold">Keterangan Kehadiran</th>
+              <th className="px-4 py-3 text-right font-semibold">Nominal</th>
+              <th className="px-4 py-3 text-center font-semibold">Status</th>
+            </tr></thead>
+            <tbody className="divide-y divide-gray-200">
+              {unpaid.map((f, i) => (
+                <tr key={i} className={`hover:bg-gray-50 transition-colors ${selected.includes(f.IDTransaksi) ? 'bg-blue-50/50' : 'even:bg-gray-50/50'}`}>
+                  <td className="px-4 py-2 text-center"><input type="checkbox" checked={selected.includes(f.IDTransaksi)} onChange={() => toggleSelect(f.IDTransaksi)} className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"/></td>
+                  <td className="px-4 py-2 font-medium text-gray-800">{f.NamaSiswa}<div className="text-xs text-gray-500 font-normal">{f.Tanggal}</div></td>
+                  <td className="px-4 py-2"><span className="bg-yellow-100 text-yellow-800 border border-yellow-200 px-2 py-1 rounded text-xs">{f.Kategori}</span></td>
+                  <td className="px-4 py-2 font-medium text-right text-red-600">Rp {Number(f.Nominal).toLocaleString('id-ID')}</td>
+                  <td className="px-4 py-2 text-center"><span className="text-red-500 font-medium text-xs">Belum Lunas</span></td>
+                </tr>
+              ))}
+              {unpaid.length === 0 && <tr><td colSpan="5" className="p-8 text-center text-gray-500 text-sm">Tidak ada tunggakan terbuka.</td></tr>}
+            </tbody>
+          </table>
         </div>
-      )}
+      </div>
     </div>
   );
 }
@@ -1025,12 +986,92 @@ function AttendanceInputView({ students, onPost, showToast }) {
   );
 }
 
-function IncomeInputView({ onPost }) {
+function IncomeInputView({ data, user, onPost }) {
+  const [selected, setSelected] = useState([]);
+  const [confirmMsg, setConfirmMsg] = useState(null);
+
+  const paid = useMemo(() => data.filter(f => f.Status === 'Lunas'), [data]);
+
+  const toggleSelect = (id) => setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  const toggleSelectAll = () => setSelected(selected.length === paid.length && paid.length > 0 ? [] : paid.map(f => f.IDTransaksi));
+
+  const handleDeleteSelected = () => {
+    if (selected.length === 0) return;
+    setConfirmMsg({
+      title: "Hapus Pemasukan",
+      message: `Yakin ingin menghapus ${selected.length} data pemasukan yang dipilih? (Tindakan ini tidak dapat dibatalkan)`,
+      onConfirm: () => {
+        onPost('deleteTransactions', { ids: selected }, `${selected.length} data pemasukan berhasil dihapus.`);
+        setSelected([]);
+        setConfirmMsg(null);
+      }
+    });
+  };
+
+  const handleClearAll = () => {
+    setConfirmMsg({
+      title: "Hapus Semua Pemasukan",
+      message: "Yakin ingin menghapus SEMUA data pemasukan? (Hanya menghapus data Lunas)",
+      onConfirm: () => {
+        onPost('clearData', { target: 'finance_in' }, "Semua riwayat pemasukan dibersihkan.");
+        setSelected([]);
+        setConfirmMsg(null);
+      }
+    });
+  };
+
   const handleSubmit = (d) => onPost('addIncome', { ...d, kategori: 'Pemasukan Lain', status: 'Lunas', via: 'Tunai' }, "Pemasukan berhasil dicatat");
+  
   return (
-    <div className="max-w-md mx-auto bg-white rounded border border-gray-300 shadow-sm overflow-hidden">
-      <div className="bg-gray-100 p-3 border-b border-gray-300 font-semibold text-gray-700 flex items-center gap-2"><PlusCircle size={16} className="text-blue-600"/> Catat Pemasukan Manual</div>
-      <div className="p-5"><ModalForm inline onSubmit={handleSubmit} fields={[{n:'tanggal',t:'date'},{n:'nama',l:'Sumber Dana'},{n:'nominal',t:'number'}]} /></div>
+    <div className="space-y-6 animate-fade-in">
+      {confirmMsg && <ConfirmModal title={confirmMsg.title} message={confirmMsg.message} onConfirm={confirmMsg.onConfirm} onCancel={() => setConfirmMsg(null)} />}
+      
+      {/* Kolom Isian Manual */}
+      <div className="bg-white rounded border border-gray-300 shadow-sm overflow-hidden">
+        <div className="bg-gray-100 p-3 border-b border-gray-300 font-semibold text-gray-700 flex items-center gap-2"><PlusCircle size={16} className="text-blue-600"/> Catat Pemasukan Manual</div>
+        <div className="p-5"><ModalForm inline onSubmit={handleSubmit} fields={[{n:'tanggal',t:'date'},{n:'nama',l:'Sumber Dana'},{n:'nominal',t:'number'}]} /></div>
+      </div>
+
+      {/* Log Tabel Pemasukan dengan Fitur Hapus */}
+      <div className="bg-white rounded border border-gray-300 shadow-sm overflow-hidden">
+        <div className="bg-gray-100 p-3 border-b border-gray-300 flex flex-col sm:flex-row justify-between items-center gap-3">
+          <h3 className="text-sm font-semibold text-gray-700">Log Pemasukan (Kas & Denda)</h3>
+          {user.role === ROLES.BENDAHARA && (
+            <div className="flex gap-2">
+              {selected.length > 0 && (
+                <button onClick={handleDeleteSelected} className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded text-xs transition-colors flex items-center gap-1 border border-red-700"><Trash2 size={14}/> Hapus Terpilih ({selected.length})</button>
+              )}
+              {paid.length > 0 && (
+                <button onClick={handleClearAll} className="bg-white hover:bg-red-50 text-red-600 px-3 py-1.5 rounded text-xs transition-colors flex items-center gap-1 border border-red-200"><Trash2 size={14}/> Bersihkan Semua</button>
+              )}
+            </div>
+          )}
+        </div>
+        <div className="overflow-x-auto max-h-[600px]">
+          <table className="min-w-full text-left text-sm whitespace-nowrap relative">
+            <thead className="sticky top-0 z-10 bg-white shadow-sm">
+              <tr className="bg-gray-100 border-b border-gray-300 text-gray-700">
+                <th className="px-4 py-3 w-10 text-center"><input type="checkbox" checked={paid.length > 0 && selected.length === paid.length} onChange={toggleSelectAll} className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"/></th>
+                <th className="px-4 py-3 font-semibold">Tanggal</th>
+                <th className="px-4 py-3 font-semibold">Sumber / Anggota</th>
+                <th className="px-4 py-3 font-semibold">Kategori</th>
+                <th className="px-4 py-3 text-right font-semibold">Nominal</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {paid.length > 0 ? paid.map((f, i) => (
+                <tr key={i} className={`hover:bg-gray-50 transition-colors ${selected.includes(f.IDTransaksi) ? 'bg-blue-50/50' : 'even:bg-gray-50/50'}`}>
+                  <td className="px-4 py-2 text-center"><input type="checkbox" checked={selected.includes(f.IDTransaksi)} onChange={() => toggleSelect(f.IDTransaksi)} className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"/></td>
+                  <td className="px-4 py-2 text-gray-600">{f.Tanggal}</td>
+                  <td className="px-4 py-2 font-medium text-gray-800 uppercase">{f.NamaSiswa}</td>
+                  <td className="px-4 py-2"><span className={`px-2 py-1 rounded text-xs border font-medium ${String(f.Kategori).toLowerCase().includes('denda') ? 'bg-orange-50 text-orange-700 border-orange-200' : 'bg-green-50 text-green-700 border-green-200'}`}>{f.Kategori}</span></td>
+                  <td className="px-4 py-2 font-medium text-right text-green-600">+ Rp {Number(f.Nominal).toLocaleString('id-ID')}</td>
+                </tr>
+              )) : <tr><td colSpan="5" className="p-8 text-center text-gray-500 text-sm">Belum ada data riwayat pemasukan.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }
@@ -1039,6 +1080,7 @@ function StudentListView({ students, onPost }) {
   const [search, setSearch] = useState('');
   const [classFilter, setClassFilter] = useState('Semua');
   const [editModal, setEditModal] = useState({ show: false, student: null });
+  const [showAddModal, setShowAddModal] = useState(false);
   const [confirmMsg, setConfirmMsg] = useState(null);
 
   const classes = useMemo(() => ['Semua', ...new Set(students.map(s => s.Kelas))], [students]);
@@ -1049,6 +1091,13 @@ function StudentListView({ students, onPost }) {
     const formData = new FormData(e.target); 
     onPost('editStudent', {oldName: editModal.student.NamaLengkap, newName: formData.get('nama'), newClass: formData.get('kelas')}, "Profil anggota diperbarui"); 
     setEditModal({ show: false, student: null }); 
+  };
+
+  const handleAdd = (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    onPost('addStudent', { nama: formData.get('nama'), kelas: formData.get('kelas') }, "Anggota baru berhasil ditambahkan");
+    setShowAddModal(false);
   };
 
   const handleDelete = (s) => {
@@ -1067,7 +1116,12 @@ function StudentListView({ students, onPost }) {
       {confirmMsg && <ConfirmModal title={confirmMsg.title} message={confirmMsg.message} onConfirm={confirmMsg.onConfirm} onCancel={() => setConfirmMsg(null)} />}
       
       <div className="bg-gray-100 p-3 border-b border-gray-300 flex flex-col sm:flex-row justify-between items-center gap-3">
-        <h3 className="text-sm font-semibold text-gray-700">Daftar Anggota</h3>
+        <div className="flex items-center gap-3 w-full sm:w-auto">
+          <h3 className="text-sm font-semibold text-gray-700">Daftar Anggota</h3>
+          <button onClick={() => setShowAddModal(true)} className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-xs font-medium flex items-center gap-1 transition-colors border border-blue-700 shadow-sm">
+            <PlusCircle size={14}/> Tambah Baru
+          </button>
+        </div>
         <div className="flex gap-2 w-full sm:w-auto">
           <input type="text" placeholder="Cari..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full sm:w-48 text-sm border border-gray-300 rounded px-3 py-1.5 focus:outline-none focus:ring-4 focus:ring-blue-200" />
           <select value={classFilter} onChange={(e) => setClassFilter(e.target.value)} className="text-sm border border-gray-300 rounded px-2 py-1.5 bg-white focus:outline-none focus:ring-4 focus:ring-blue-200">{classes.map(c => <option key={c} value={c}>{c}</option>)}</select>
@@ -1090,7 +1144,52 @@ function StudentListView({ students, onPost }) {
           </tbody>
         </table>
       </div>
-      {editModal.show && (<div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"><div className="bg-white rounded border border-gray-300 shadow-lg w-full max-w-sm overflow-hidden"><div className="bg-gray-100 p-3 border-b border-gray-300 flex justify-between items-center font-semibold text-gray-800">Update Profil<button onClick={() => setEditModal({ show: false, student: null })} className="text-gray-500 hover:text-gray-800"><X size={18} /></button></div><form onSubmit={handleUpdate} className="p-5 space-y-4"><div className="space-y-1"><label className="block text-sm font-medium text-gray-700">Nama</label><input name="nama" type="text" defaultValue={editModal.student.NamaLengkap} required className="w-full text-base border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-4 focus:ring-blue-200" /></div><div className="space-y-1"><label className="block text-sm font-medium text-gray-700">Kelas</label><input name="kelas" type="text" defaultValue={editModal.student.Kelas} required className="w-full text-base border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-4 focus:ring-blue-200" /></div><button type="submit" className="w-full bg-blue-600 border border-blue-700 text-white py-2 rounded text-base font-medium hover:bg-blue-700 focus:ring-4 focus:ring-blue-200">Perbarui</button></form></div></div>)}
+
+      {/* Modal Tambah Siswa */}
+      {showAddModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded border border-gray-300 shadow-lg w-full max-w-sm overflow-hidden">
+            <div className="bg-gray-100 p-3 border-b border-gray-300 flex justify-between items-center font-semibold text-gray-800">
+              Tambah Anggota Baru
+              <button onClick={() => setShowAddModal(false)} className="text-gray-500 hover:text-gray-800"><X size={18} /></button>
+            </div>
+            <form onSubmit={handleAdd} className="p-5 space-y-4">
+              <div className="space-y-1">
+                <label className="block text-sm font-medium text-gray-700">Nama Lengkap</label>
+                <input name="nama" type="text" required placeholder="Masukkan nama..." className="w-full text-base border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-4 focus:ring-blue-200" />
+              </div>
+              <div className="space-y-1">
+                <label className="block text-sm font-medium text-gray-700">Kelas</label>
+                <input name="kelas" type="text" required placeholder="Contoh: X MIPA 1" className="w-full text-base border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-4 focus:ring-blue-200" />
+              </div>
+              <button type="submit" className="w-full bg-green-600 border border-green-700 text-white py-2 rounded text-base font-medium hover:bg-green-700 focus:ring-4 focus:ring-green-200 transition-colors">Simpan Data</button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Edit Siswa */}
+      {editModal.show && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded border border-gray-300 shadow-lg w-full max-w-sm overflow-hidden">
+            <div className="bg-gray-100 p-3 border-b border-gray-300 flex justify-between items-center font-semibold text-gray-800">
+              Update Profil
+              <button onClick={() => setEditModal({ show: false, student: null })} className="text-gray-500 hover:text-gray-800"><X size={18} /></button>
+            </div>
+            <form onSubmit={handleUpdate} className="p-5 space-y-4">
+              <div className="space-y-1">
+                <label className="block text-sm font-medium text-gray-700">Nama</label>
+                <input name="nama" type="text" defaultValue={editModal.student.NamaLengkap} required className="w-full text-base border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-4 focus:ring-blue-200" />
+              </div>
+              <div className="space-y-1">
+                <label className="block text-sm font-medium text-gray-700">Kelas</label>
+                <input name="kelas" type="text" defaultValue={editModal.student.Kelas} required className="w-full text-base border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-4 focus:ring-blue-200" />
+              </div>
+              <button type="submit" className="w-full bg-blue-600 border border-blue-700 text-white py-2 rounded text-base font-medium hover:bg-blue-700 focus:ring-4 focus:ring-blue-200 transition-colors">Perbarui</button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1110,11 +1209,11 @@ function ContentRouter({ view, user, data, actions }) {
   switch (view) {
     case 'dashboard': return <AdminDashboardView data={data} user={user} actions={actions} />;
     case 'attendance-input': return hasAccess([ROLES.SEKRETARIS]) ? <AttendanceInputView students={data.students} onPost={actions.genericPost} showToast={actions.showToast} /> : <AccessDenied />;
-    case 'income-input': return hasAccess([ROLES.BENDAHARA]) ? <IncomeInputView onPost={actions.genericPost} /> : <AccessDenied />;
+    case 'income-input': return hasAccess([ROLES.BENDAHARA]) ? <IncomeInputView data={data.finance} user={user} onPost={actions.genericPost} /> : <AccessDenied />;
     case 'finance': return hasAccess([ROLES.ADMIN, ROLES.BENDAHARA]) ? <FinanceView data={data.finance} user={user} onPost={actions.genericPost} /> : <AccessDenied />;
     case 'expenses': return hasAccess([ROLES.ADMIN, ROLES.BENDAHARA]) ? <ExpenseView data={data.expenses} user={user} onPost={actions.genericPost} /> : <AccessDenied />;
     case 'attendance-recap': return <AttendanceRecapView history={data.history} onPost={actions.genericPost} />;
-    case 'users': return user.role === ROLES.ADMIN ? <StudentListView students={data.students} onPost={actions.genericPost} /> : <GenericTable title="Daftar Anggota" headers={['NamaLengkap','Kelas']} rows={data.students} />;
+    case 'users': return (user.role === ROLES.ADMIN || user.role === ROLES.SEKRETARIS) ? <StudentListView students={data.students} onPost={actions.genericPost} /> : <GenericTable title="Daftar Anggota" headers={['NamaLengkap','Kelas']} rows={data.students} />;
     case 'user-mgmt': return hasAccess([ROLES.ADMIN]) ? <UserManagementView users={data.appUsers} onPost={actions.genericPost} /> : <AccessDenied />;
     default: return <AdminDashboardView data={data} user={user} actions={actions} />;
   }
