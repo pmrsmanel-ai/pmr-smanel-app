@@ -49,7 +49,10 @@ function AppLogo({ className, fallbackSize = 24 }) {
 // === 1. HALAMAN DASHBOARD PUBLIK ===
 function PublicDashboard({ data, onLoginClick, loading }) {
   const [detailView, setDetailView] = useState(null); // null, 'Hadir', 'Alpha', 'Sakit', 'Izin'
-  const [financeDetailView, setFinanceDetailView] = useState(null); // null, 'Pemasukan', 'Pengeluaran', 'Tunggakan'
+  
+  // Membaca URL parameter agar bisa langsung membuka modal Tunggakan jika link khusus diklik
+  const initialFinanceView = new URLSearchParams(window.location.search).get('view') === 'tunggakan' ? 'Tunggakan' : null;
+  const [financeDetailView, setFinanceDetailView] = useState(initialFinanceView); // null, 'Pemasukan', 'Pengeluaran', 'Tunggakan'
 
   const stats = useMemo(() => {
     const incList = data.finance.filter(f => f.Status === 'Lunas');
@@ -244,7 +247,13 @@ function PublicDashboard({ data, onLoginClick, loading }) {
                     <h3 className="text-lg font-bold text-gray-800">Daftar Transaksi: <span className="text-blue-600 uppercase">{financeDetailView}</span></h3>
                     <p className="text-sm text-gray-500">Rincian data {financeDetailView.toLowerCase()} organisasi</p>
                   </div>
-                  <button onClick={() => setFinanceDetailView(null)} className="text-gray-500 hover:text-red-600 transition-colors bg-white hover:bg-red-50 p-1.5 rounded border border-transparent hover:border-red-200"><X size={20}/></button>
+                  <button onClick={() => {
+                    // Reset URL parameters jika ada, saat menutup modal
+                    if (window.history.replaceState) {
+                       window.history.replaceState(null, '', window.location.pathname);
+                    }
+                    setFinanceDetailView(null);
+                  }} className="text-gray-500 hover:text-red-600 transition-colors bg-white hover:bg-red-50 p-1.5 rounded border border-transparent hover:border-red-200"><X size={20}/></button>
                </div>
                <div className="p-0 overflow-y-auto flex-1 bg-gray-50">
                   <ul className="divide-y divide-gray-200 m-0">
@@ -536,9 +545,11 @@ function AdminDashboardView({ data, user, actions }) {
     const dateStr = new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     
     // Mengambil URL website saat ini secara otomatis
-    const webLink = window.location.origin; 
+    const baseUrl = window.location.origin + window.location.pathname;
+    const webLink = baseUrl; 
+    const tunggakanLink = `${baseUrl}?view=tunggakan`;
 
-    const reportText = `*📊 LAPORAN KEUANGAN PMR SMANEL*\nTanggal: ${dateStr}\n\n*💰 RINGKASAN KAS:*\n🟢 Total Pemasukan: Rp ${stats.inc.toLocaleString('id-ID')}\n🔴 Total Pengeluaran: Rp ${stats.exp.toLocaleString('id-ID')}\n🔵 *Saldo Akhir Aktif: Rp ${stats.bal.toLocaleString('id-ID')}*\n\n*📝 RINCIAN TAGIHAN & DENDA:*\n- Total Tunggakan Terbuka: Rp ${stats.debt.toLocaleString('id-ID')} (${stats.debtCount} Tagihan)\n- Pengeluaran Tercatat: ${stats.expCount} Item\n\n*🔗 LINK CEK TUNGGAKAN & DASHBOARD ANGGOTA:*\nSilakan klik tautan di bawah ini untuk melihat rincian tunggakan pribadi dan transparansi laporan secara lengkap:\n👉 ${webLink}\n\nMohon bagi anggota yang masih memiliki tunggakan kas atau denda untuk segera menyelesaikannya. Terima kasih! 🙏\n\n_Sistem Manajemen PMR SMANEL_`;
+    const reportText = `*📊 LAPORAN KEUANGAN PMR SMANEL*\nTanggal: ${dateStr}\n\n*💰 RINGKASAN KAS:*\n🟢 Total Pemasukan: Rp ${stats.inc.toLocaleString('id-ID')}\n🔴 Total Pengeluaran: Rp ${stats.exp.toLocaleString('id-ID')}\n🔵 *Saldo Akhir Aktif: Rp ${stats.bal.toLocaleString('id-ID')}*\n\n*📝 RINCIAN TAGIHAN & DENDA:*\n- Total Tunggakan Terbuka: Rp ${stats.debt.toLocaleString('id-ID')} (${stats.debtCount} Tagihan)\n- Pengeluaran Tercatat: ${stats.expCount} Item\n\n*🔗 LINK AKSES ANGGOTA:*\n\n1️⃣ *Cek Daftar Tunggakan Langsung:*\n👉 ${tunggakanLink}\n\n2️⃣ *Dashboard Utama (Transparansi):*\n👉 ${webLink}\n\nMohon bagi anggota yang masih memiliki tunggakan kas atau denda untuk segera menyelesaikannya. Terima kasih! 🙏\n\n_Sistem Manajemen PMR SMANEL_`;
 
     if (navigator.share) {
       try {
