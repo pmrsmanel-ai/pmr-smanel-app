@@ -867,7 +867,7 @@ function FinanceView({ data, user, onPost }) {
       title: "Hapus Semua Tunggakan",
       message: `Anda yakin ingin menghapus semua data Tunggakan Aktif? Tindakan ini tidak bisa dibatalkan.`,
       onConfirm: () => {
-        onPost('clearData', { target }, `Data Tunggakan berhasil dibersihkan.`);
+        onPost('clearData', { target }, `Data Tunggakan berhasil dibersihkan dari Spreadsheet.`);
         setConfirmMsg(null);
       }
     });
@@ -926,7 +926,7 @@ function ExpenseView({ data, user, onPost }) {
   const handleClear = () => { 
     setConfirmMsg({
       title: "Hapus Log Pengeluaran",
-      message: "Yakin ingin menghapus semua riwayat pengeluaran kas?",
+      message: "Yakin ingin menghapus semua riwayat pengeluaran kas dari Spreadsheet?",
       onConfirm: () => {
         onPost('clearData', {target:'expense'}, "Log pengeluaran dibersihkan."); 
         setConfirmMsg(null);
@@ -1023,11 +1023,23 @@ function IncomeInputView({ data, user, onPost }) {
   const handleDeleteSelected = () => {
     if (selected.length === 0) return;
     setConfirmMsg({
-      title: "Hapus Pemasukan",
-      message: `Yakin ingin menghapus ${selected.length} data pemasukan yang dipilih? (Tindakan ini tidak dapat dibatalkan)`,
+      title: "Hapus Pemasukan (Massal)",
+      message: `Yakin ingin menghapus ${selected.length} data pemasukan yang dipilih secara permanen dari Spreadsheet? (Tindakan ini tidak dapat dibatalkan)`,
       onConfirm: () => {
-        onPost('deleteTransactions', { ids: selected }, `${selected.length} data pemasukan berhasil dihapus.`);
+        onPost('deleteTransactions', { ids: selected }, `${selected.length} data pemasukan berhasil dihapus dari Spreadsheet.`);
         setSelected([]);
+        setConfirmMsg(null);
+      }
+    });
+  };
+
+  const handleDeleteSingle = (id) => {
+    setConfirmMsg({
+      title: "Hapus Pemasukan",
+      message: "Yakin ingin menghapus data pemasukan ini secara permanen dari Spreadsheet?",
+      onConfirm: () => {
+        onPost('deleteTransactions', { ids: [id] }, "Data pemasukan berhasil dihapus dari Spreadsheet.");
+        setSelected(prev => prev.filter(x => x !== id));
         setConfirmMsg(null);
       }
     });
@@ -1036,9 +1048,9 @@ function IncomeInputView({ data, user, onPost }) {
   const handleClearAll = () => {
     setConfirmMsg({
       title: "Hapus Semua Pemasukan",
-      message: "Yakin ingin menghapus SEMUA data pemasukan? (Hanya menghapus data Lunas)",
+      message: "Yakin ingin menghapus SEMUA data pemasukan secara permanen dari Spreadsheet? (Hanya menghapus data Lunas)",
       onConfirm: () => {
-        onPost('clearData', { target: 'finance_in' }, "Semua riwayat pemasukan dibersihkan.");
+        onPost('clearData', { target: 'finance_in' }, "Semua riwayat pemasukan dibersihkan dari Spreadsheet.");
         setSelected([]);
         setConfirmMsg(null);
       }
@@ -1081,6 +1093,7 @@ function IncomeInputView({ data, user, onPost }) {
                 <th className="px-4 py-3 font-semibold">Sumber / Anggota</th>
                 <th className="px-4 py-3 font-semibold">Kategori</th>
                 <th className="px-4 py-3 text-right font-semibold">Nominal</th>
+                <th className="px-4 py-3 text-center font-semibold">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
@@ -1091,8 +1104,13 @@ function IncomeInputView({ data, user, onPost }) {
                   <td className="px-4 py-2 font-medium text-gray-800 uppercase">{f.NamaSiswa}</td>
                   <td className="px-4 py-2"><span className={`px-2 py-1 rounded text-xs border font-medium ${String(f.Kategori).toLowerCase().includes('denda') ? 'bg-orange-50 text-orange-700 border-orange-200' : 'bg-green-50 text-green-700 border-green-200'}`}>{f.Kategori}</span></td>
                   <td className="px-4 py-2 font-medium text-right text-green-600">+ Rp {Number(f.Nominal).toLocaleString('id-ID')}</td>
+                  <td className="px-4 py-2 text-center">
+                    <button onClick={() => handleDeleteSingle(f.IDTransaksi)} className="btn btn-sm bg-red-100 text-red-700 hover:bg-red-200 px-2 py-1 rounded border border-red-200" title="Hapus Data Pemasukan dari Spreadsheet">
+                      <Trash2 size={14} />
+                    </button>
+                  </td>
                 </tr>
-              )) : <tr><td colSpan="5" className="p-8 text-center text-gray-500 text-sm">Belum ada data riwayat pemasukan.</td></tr>}
+              )) : <tr><td colSpan="6" className="p-8 text-center text-gray-500 text-sm">Belum ada data riwayat pemasukan.</td></tr>}
             </tbody>
           </table>
         </div>
