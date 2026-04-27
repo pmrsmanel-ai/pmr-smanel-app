@@ -39,10 +39,72 @@ const formatTime = (dateString) => {
 function AppLogo({ className, fallbackSize = 24 }) {
   const [imgError, setImgError] = useState(false);
   if (imgError || !LOGO_URL) {
-    return <ShieldCheck size={fallbackSize} className={`text-red-600 ${className.replace(/border[^ ]*/g, '').replace(/shadow[^ ]*/g, '')}`} />;
+    return <ShieldCheck size={fallbackSize} className={`text-red-600 ${(className || '').replace(/border[^ ]*/g, '').replace(/shadow[^ ]*/g, '')}`} />;
   }
   return (
     <img src={LOGO_URL} alt="Logo PMR" className={className} onError={() => setImgError(true)} referrerPolicy="no-referrer" />
+  );
+}
+
+// --- KOMPONEN ITEM TUNGGAKAN DIKELOMPOKKAN ---
+function GroupedDebtItem({ item }) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <li className="px-5 py-3 bg-white hover:bg-gray-50 transition-colors flex flex-col border-b border-gray-200 last:border-b-0">
+      <div className="flex justify-between items-center cursor-pointer" onClick={() => setExpanded(!expanded)}>
+        <div>
+          <div className="flex items-center gap-2">
+            <p className="font-semibold text-sm text-gray-800 uppercase">{item.NamaSiswa || 'Tanpa Nama'}</p>
+            <span className="bg-red-100 text-red-700 text-[10px] px-2 py-0.5 rounded font-bold tracking-wider">{(item.Details || []).length} ITEM</span>
+          </div>
+          <p className="text-[11px] text-blue-600 mt-1 hover:underline flex items-center gap-1">
+            {expanded ? 'Sembunyikan rincian' : 'Lihat rincian'}
+          </p>
+        </div>
+        <span className="font-bold text-red-600 text-sm whitespace-nowrap">Rp {Number(item.TotalNominal || 0).toLocaleString('id-ID')}</span>
+      </div>
+      {expanded && (
+        <ul className="mt-3 pl-3 border-l-2 border-red-300 space-y-2 mb-1 animate-fade-in">
+          {(item.Details || []).map((det, idx) => (
+            <li key={idx} className="flex justify-between items-center text-xs">
+              <span className="text-gray-600">{det.Tanggal} • <span className="font-medium text-gray-700">{det.Kategori}</span></span>
+              <span className="text-gray-500 font-medium">Rp {Number(det.Nominal || 0).toLocaleString('id-ID')}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </li>
+  );
+}
+
+// --- KOMPONEN ITEM KATEGORI KAS DIKELOMPOKKAN ---
+function GroupedCategoryItem({ item }) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <li className="px-5 py-3 bg-white hover:bg-gray-50 transition-colors flex flex-col border-b border-gray-200 last:border-b-0">
+      <div className="flex justify-between items-center cursor-pointer" onClick={() => setExpanded(!expanded)}>
+        <div>
+          <div className="flex items-center gap-2">
+            <p className="font-semibold text-sm text-gray-800 uppercase">{item.Kategori || 'Tanpa Kategori'}</p>
+            <span className="bg-green-100 text-green-700 text-[10px] px-2 py-0.5 rounded font-bold tracking-wider">{(item.Details || []).length} TRANSAKSI</span>
+          </div>
+          <p className="text-[11px] text-blue-600 mt-1 hover:underline flex items-center gap-1">
+            {expanded ? 'Sembunyikan rincian' : 'Lihat rincian'}
+          </p>
+        </div>
+        <span className="font-bold text-green-600 text-sm whitespace-nowrap">+ Rp {Number(item.TotalNominal || 0).toLocaleString('id-ID')}</span>
+      </div>
+      {expanded && (
+        <ul className="mt-3 pl-3 border-l-2 border-green-300 space-y-2 mb-1 animate-fade-in max-h-48 overflow-y-auto">
+          {(item.Details || []).map((det, idx) => (
+            <li key={idx} className="flex justify-between items-center text-xs">
+              <span className="text-gray-600">{det.Tanggal} • <span className="font-medium text-gray-700 uppercase">{det.NamaSiswa}</span></span>
+              <span className="text-gray-500 font-medium">Rp {Number(det.Nominal || 0).toLocaleString('id-ID')}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </li>
   );
 }
 
@@ -54,41 +116,79 @@ function PublicDashboard({ data, onLoginClick, loading }) {
   const [financeDetailView, setFinanceDetailView] = useState(initialFinanceView); 
 
   const stats = useMemo(() => {
-    const incList = data.finance.filter(f => f.Status === 'Lunas');
-    const debtList = data.finance.filter(f => f.Status === 'Belum Lunas');
-    
-    // Semua Pemasukan di luar denda masuk KAS
-    const incDendaList = incList.filter(f => String(f.Kategori).toLowerCase().includes('denda'));
-    const incKasList = incList.filter(f => !String(f.Kategori).toLowerCase().includes('denda'));
+    const safeFinance = data?.finance || [];
+    const safeExpenses = data?.expenses || [];
 
-    const incKas = incKasList.reduce((a,b) => a+Number(b.Nominal), 0);
-    const incDenda = incDendaList.reduce((a,b) => a+Number(b.Nominal), 0);
-    const inc = incList.reduce((a,b) => a+Number(b.Nominal), 0);
-    const exp = data.expenses.reduce((a,b) => a+Number(b.Nominal), 0);
+    const incList = safeFinance.filter(f => f.Status === 'Lunas');
+    const debtList = safeFinance.filter(f => f.Status === 'Belum Lunas');
+    
+    // Pemisahan Pemasukan Kas dan Denda
+    const incDendaList = incList.filter(f => String(f.Kategori || '').toLowerCase().includes('denda'));
+    const incKasList = incList.filter(f => !String(f.Kategori || '').toLowerCase().includes('denda'));
+
+    const incKas = incKasList.reduce((a,b) => a+Number(b.Nominal || 0), 0);
+    const incDenda = incDendaList.reduce((a,b) => a+Number(b.Nominal || 0), 0);
+    const inc = incList.reduce((a,b) => a+Number(b.Nominal || 0), 0);
+    const exp = safeExpenses.reduce((a,b) => a+Number(b.Nominal || 0), 0);
 
     // Pemisahan Tunggakan Kas vs Denda
-    const debtDendaList = debtList.filter(f => String(f.Kategori).toLowerCase().includes('denda'));
-    const debtKasList = debtList.filter(f => !String(f.Kategori).toLowerCase().includes('denda'));
-    const debtKas = debtKasList.reduce((a,b) => a+Number(b.Nominal), 0);
-    const debtDenda = debtDendaList.reduce((a,b) => a+Number(b.Nominal), 0);
-    const debt = debtList.reduce((a,b) => a+Number(b.Nominal), 0);
+    const debtDendaList = debtList.filter(f => String(f.Kategori || '').toLowerCase().includes('denda'));
+    const debtKasList = debtList.filter(f => !String(f.Kategori || '').toLowerCase().includes('denda'));
+    const debtKas = debtKasList.reduce((a,b) => a+Number(b.Nominal || 0), 0);
+    const debtDenda = debtDendaList.reduce((a,b) => a+Number(b.Nominal || 0), 0);
+    const debt = debtList.reduce((a,b) => a+Number(b.Nominal || 0), 0);
+
+    // Helper untuk mengelompokkan tunggakan berdasarkan nama siswa
+    const groupDebts = (list) => {
+      const groups = {};
+      list.forEach(item => {
+        const key = item.NamaSiswa || 'Tanpa Nama';
+        if (!groups[key]) {
+          groups[key] = { NamaSiswa: key, TotalNominal: 0, Details: [] };
+        }
+        groups[key].TotalNominal += Number(item.Nominal || 0);
+        groups[key].Details.push(item);
+      });
+      return Object.values(groups).sort((a, b) => b.TotalNominal - a.TotalNominal);
+    };
+
+    // Helper untuk mengelompokkan pemasukan berdasarkan Kategori
+    const groupByCategory = (list) => {
+      const groups = {};
+      list.forEach(item => {
+        const key = item.Kategori || 'Lainnya';
+        if (!groups[key]) {
+          groups[key] = { Kategori: key, TotalNominal: 0, Details: [] };
+        }
+        groups[key].TotalNominal += Number(item.Nominal || 0);
+        groups[key].Details.push(item);
+      });
+      return Object.values(groups).sort((a, b) => b.TotalNominal - a.TotalNominal);
+    };
     
     return { 
-      inc, incKas, incDenda, exp, bal: inc - exp, debt, debtKas, debtDenda,
+      inc, incKas, incDenda, exp, debt, debtKas, debtDenda,
+      balKas: incKas - exp, 
+      balDenda: incDenda,   
       incCount: incList.length, 
       incKasCount: incKasList.length,
       incDendaCount: incDendaList.length,
       debtCount: debtList.length, 
       debtKasCount: debtKasList.length,
       debtDendaCount: debtDendaList.length,
-      expCount: data.expenses.length,
+      expCount: safeExpenses.length,
       incList, incKasList, incDendaList,
-      unpaidList: debtList, debtKasList, debtDendaList, expList: data.expenses
+      unpaidList: debtList, debtKasList, debtDendaList, expList: safeExpenses,
+      // List yang sudah dikelompokkan
+      groupedIncKasList: groupByCategory(incKasList),
+      groupedDebtDendaList: groupDebts(debtDendaList),
+      groupedDebtKasList: groupDebts(debtKasList),
+      groupedUnpaidList: groupDebts(debtList)
     };
   }, [data.finance, data.expenses]);
 
   const latestAttendance = useMemo(() => {
-    if (!data.history || data.history.length === 0) return null;
+    if (!data?.history || data.history.length === 0) return null;
     const latest = data.history[0];
     const records = data.history.filter(h => h.Tanggal === latest.Tanggal && h.Kegiatan === latest.Kegiatan);
     return {
@@ -136,21 +236,20 @@ function PublicDashboard({ data, onLoginClick, loading }) {
         ) : (
           <div className="space-y-6">
             
-            {/* GRID KARTU KEUANGAN TERPISAH KAS DAN DENDA */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-              <StatCard label="Saldo Kas" val={stats.bal} color="blue" icon={<Wallet size={16}/>} />
-              <StatCard label="Masuk (Kas)" val={stats.incKas} color="green" icon={<TrendingUp size={16}/>} onClickDetail={() => setFinanceDetailView('Pemasukan Kas')} />
-              <StatCard label="Masuk (Denda)" val={stats.incDenda} color="green" icon={<Coins size={16}/>} onClickDetail={() => setFinanceDetailView('Pemasukan Denda')} />
-              <StatCard label="Tunggakan (Kas)" val={stats.debtKas} color="orange" icon={<AlertCircle size={16}/>} onClickDetail={() => setFinanceDetailView('Tunggakan Kas')} />
-              <StatCard label="Tunggakan (Denda)" val={stats.debtDenda} color="red" icon={<AlertCircle size={16}/>} onClickDetail={() => setFinanceDetailView('Tunggakan Denda')} />
-              <StatCard label="Pengeluaran" val={stats.exp} color="red" icon={<TrendingDown size={16}/>} onClickDetail={() => setFinanceDetailView('Pengeluaran')} />
+              <StatCard label="Saldo Kas Aktif" val={stats.balKas} color="blue" icon={<Wallet size={16}/>} />
+              <StatCard label="Saldo Denda Terkumpul" val={stats.balDenda} color="yellow" icon={<Coins size={16}/>} />
+              <StatCard label="Pemasukan Kas" val={stats.incKas} color="green" icon={<TrendingUp size={16}/>} onClickDetail={() => setFinanceDetailView('Pemasukan Kas')} />
+              <StatCard label="Tunggakan Kas" val={stats.debtKas} color="orange" icon={<AlertCircle size={16}/>} onClickDetail={() => setFinanceDetailView('Tunggakan Kas')} />
+              <StatCard label="Tunggakan Denda" val={stats.debtDenda} color="red" icon={<AlertCircle size={16}/>} onClickDetail={() => setFinanceDetailView('Tunggakan Denda')} />
+              <StatCard label="Total Pengeluaran" val={stats.exp} color="red" icon={<TrendingDown size={16}/>} onClickDetail={() => setFinanceDetailView('Pengeluaran')} />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="bg-white border border-gray-300 rounded shadow-sm flex flex-col h-[380px]">
                 <div className="bg-gray-100 px-4 py-3 border-b border-gray-300 font-semibold flex justify-between items-center">
                   <div className="flex items-center gap-2"><ClipboardList size={18} className="text-gray-600"/> Ringkasan Presensi Terakhir</div>
-                  <span className="bg-blue-600 text-white text-xs px-2 py-1 rounded">Total {data.students.length} Anggota</span>
+                  <span className="bg-blue-600 text-white text-xs px-2 py-1 rounded">Total {(data?.students || []).length} Anggota</span>
                 </div>
                 <div className="p-5 flex-1 flex flex-col">
                   {latestAttendance ? (
@@ -253,14 +352,8 @@ function PublicDashboard({ data, onLoginClick, loading }) {
                </div>
                <div className="p-0 overflow-y-auto flex-1 bg-gray-50">
                   <ul className="divide-y divide-gray-200 m-0">
-                    {financeDetailView === 'Pemasukan Kas' && stats.incKasList.length > 0 ? stats.incKasList.map((item, i) => (
-                      <li key={i} className="px-5 py-3 bg-white hover:bg-gray-50 transition-colors flex justify-between items-center gap-2">
-                        <div>
-                          <p className="font-semibold text-sm text-gray-800 uppercase">{item.NamaSiswa}</p>
-                          <p className="text-xs text-gray-500">{item.Tanggal} • {item.Kategori}</p>
-                        </div>
-                        <span className="font-bold text-green-600 text-sm whitespace-nowrap">+ Rp {Number(item.Nominal).toLocaleString('id-ID')}</span>
-                      </li>
+                    {financeDetailView === 'Pemasukan Kas' && stats.groupedIncKasList.length > 0 ? stats.groupedIncKasList.map((item, i) => (
+                      <GroupedCategoryItem key={i} item={item} />
                     )) : financeDetailView === 'Pemasukan Kas' && <li className="p-8 text-center text-gray-500 text-sm">Belum ada data uang kas masuk.</li>}
 
                     {financeDetailView === 'Pemasukan Denda' && stats.incDendaList.length > 0 ? stats.incDendaList.map((item, i) => (
@@ -273,34 +366,16 @@ function PublicDashboard({ data, onLoginClick, loading }) {
                       </li>
                     )) : financeDetailView === 'Pemasukan Denda' && <li className="p-8 text-center text-gray-500 text-sm">Belum ada data uang denda masuk.</li>}
 
-                    {financeDetailView === 'Tunggakan Kas' && stats.debtKasList.length > 0 ? stats.debtKasList.map((item, i) => (
-                      <li key={i} className="px-5 py-3 bg-white hover:bg-gray-50 transition-colors flex justify-between items-center gap-2">
-                        <div>
-                          <p className="font-semibold text-sm text-gray-800 uppercase">{item.NamaSiswa}</p>
-                          <p className="text-xs text-gray-500">{item.Tanggal} • {item.Kategori}</p>
-                        </div>
-                        <span className="font-bold text-orange-500 text-sm whitespace-nowrap">Rp {Number(item.Nominal).toLocaleString('id-ID')}</span>
-                      </li>
+                    {financeDetailView === 'Tunggakan Kas' && stats.groupedDebtKasList.length > 0 ? stats.groupedDebtKasList.map((item, i) => (
+                      <GroupedDebtItem key={i} item={item} />
                     )) : financeDetailView === 'Tunggakan Kas' && <li className="p-8 text-center text-gray-500 text-sm">Semua anggota bebas tunggakan kas.</li>}
 
-                    {financeDetailView === 'Tunggakan Denda' && stats.debtDendaList.length > 0 ? stats.debtDendaList.map((item, i) => (
-                      <li key={i} className="px-5 py-3 bg-white hover:bg-gray-50 transition-colors flex justify-between items-center gap-2">
-                        <div>
-                          <p className="font-semibold text-sm text-gray-800 uppercase">{item.NamaSiswa}</p>
-                          <p className="text-xs text-gray-500">{item.Tanggal} • {item.Kategori}</p>
-                        </div>
-                        <span className="font-bold text-red-600 text-sm whitespace-nowrap">Rp {Number(item.Nominal).toLocaleString('id-ID')}</span>
-                      </li>
+                    {financeDetailView === 'Tunggakan Denda' && stats.groupedDebtDendaList.length > 0 ? stats.groupedDebtDendaList.map((item, i) => (
+                      <GroupedDebtItem key={i} item={item} />
                     )) : financeDetailView === 'Tunggakan Denda' && <li className="p-8 text-center text-gray-500 text-sm">Semua anggota bebas tunggakan denda.</li>}
 
-                    {financeDetailView === 'Tunggakan' && stats.unpaidList.length > 0 ? stats.unpaidList.map((item, i) => (
-                      <li key={i} className="px-5 py-3 bg-white hover:bg-gray-50 transition-colors flex justify-between items-center gap-2">
-                        <div>
-                          <p className="font-semibold text-sm text-gray-800 uppercase">{item.NamaSiswa}</p>
-                          <p className="text-xs text-gray-500">{item.Tanggal} • {item.Kategori}</p>
-                        </div>
-                        <span className="font-bold text-red-600 text-sm whitespace-nowrap">Rp {Number(item.Nominal).toLocaleString('id-ID')}</span>
-                      </li>
+                    {financeDetailView === 'Tunggakan' && stats.groupedUnpaidList.length > 0 ? stats.groupedUnpaidList.map((item, i) => (
+                      <GroupedDebtItem key={i} item={item} />
                     )) : financeDetailView === 'Tunggakan' && <li className="p-8 text-center text-gray-500 text-sm">Semua anggota bebas tunggakan.</li>}
 
                     {financeDetailView === 'Pengeluaran' && stats.expList.length > 0 ? stats.expList.map((item, i) => (
@@ -426,7 +501,7 @@ function StatCard({ label, val, color, icon, onClickDetail, detailLabel }) {
           <p className="text-[11px] sm:text-xs font-semibold text-gray-500 uppercase">{label}</p>
           <div className={colors[color] ? colors[color].split(' ')[1] : 'text-gray-500'}>{icon}</div>
         </div>
-        <h2 className="text-lg sm:text-xl font-bold text-gray-800">Rp {val.toLocaleString('id-ID')}</h2>
+        <h2 className="text-lg sm:text-xl font-bold text-gray-800">Rp {Number(val || 0).toLocaleString('id-ID')}</h2>
       </div>
       {onClickDetail && (
         <button onClick={onClickDetail} className="bg-gray-50 border-t border-gray-200 text-[10px] sm:text-xs font-semibold text-gray-600 py-2 hover:bg-gray-200 transition-colors flex justify-center items-center gap-1 w-full">
@@ -438,24 +513,24 @@ function StatCard({ label, val, color, icon, onClickDetail, detailLabel }) {
 }
 
 function GenericTableInner({ headers, rows }) {
-  if (rows.length === 0) return <div className="p-8 text-center text-sm text-gray-500">Data tidak tersedia.</div>;
+  if (!rows || rows.length === 0) return <div className="p-8 text-center text-sm text-gray-500">Data tidak tersedia.</div>;
   return (
     <div className="overflow-x-auto">
       <table className="min-w-full text-left text-sm whitespace-nowrap">
         <thead>
           <tr className="bg-gray-100 border-b border-gray-300 text-gray-700">
-            {headers.map(h => <th key={h} className="px-4 py-3 font-semibold">{h}</th>)}
+            {(headers || []).map(h => <th key={h} className="px-4 py-3 font-semibold">{h}</th>)}
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-200">
           {rows.map((r, i) => (
             <tr key={i} className="hover:bg-gray-50 even:bg-gray-50/50">
-              {headers.map((h, j) => {
+              {(headers || []).map((h, j) => {
                 let val = r[h] || r[h.replace(/ /g,'')] || ''; 
                 if (!val && h === 'Keterangan Kehadiran') val = r['Kategori'];
                 if (!val && (h === 'Deskripsi' || h.includes('Sumber'))) val = r['NamaSiswa'];
                 
-                if (h === 'Nominal') val = `Rp ${Number(val).toLocaleString('id-ID')}`;
+                if (h === 'Nominal') val = `Rp ${Number(val || 0).toLocaleString('id-ID')}`;
                 
                 if (h === 'Status') return <td key={j} className="px-4 py-2"><span className={`px-2 py-1 rounded text-xs font-medium border ${val==='Hadir'?'bg-green-100 text-green-800 border-green-200':'bg-red-100 text-red-800 border-red-200'}`}>{val}</span></td>;
                 
@@ -471,7 +546,7 @@ function GenericTableInner({ headers, rows }) {
 
 function GenericTable({ title, headers, rows }) {
   const [q, setQ] = useState('');
-  const filtered = rows.filter(r => Object.values(r).some(v => String(v).toLowerCase().includes(q.toLowerCase())));
+  const filtered = (rows || []).filter(r => Object.values(r).some(v => String(v || '').toLowerCase().includes(q.toLowerCase())));
   return (
     <div className="bg-white rounded border border-gray-300 shadow-sm flex flex-col">
       <div className="bg-gray-100 p-3 border-b border-gray-300 flex justify-between items-center">
@@ -503,13 +578,13 @@ function ConfirmModal({ title, message, onConfirm, onCancel }) {
 }
 
 function ModalForm({ title, onClose, onSubmit, fields, inline }) {
-  const handleSubmit = (e) => { e.preventDefault(); const d = new FormData(e.target); const p={}; fields.forEach(f => p[f.n] = f.t==='number'?Number(d.get(f.n)):d.get(f.n)); onSubmit(p); };
+  const handleSubmit = (e) => { e.preventDefault(); const d = new FormData(e.target); const p={}; (fields || []).forEach(f => p[f.n] = f.t==='number'?Number(d.get(f.n)):d.get(f.n)); onSubmit(p); };
   const FormContent = () => (
     <form onSubmit={handleSubmit} className="space-y-4">
-      {fields.map(f => (
+      {(fields || []).map(f => (
         <div key={f.n} className="space-y-1">
           <label className="block text-sm font-medium text-gray-700">{f.l || f.n}</label>
-          {f.t === 'select' ? <select name={f.n} className="w-full text-base border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-4 focus:ring-blue-200 focus:border-blue-500">{f.o.map(o=><option key={o}>{o}</option>)}</select> : 
+          {f.t === 'select' ? <select name={f.n} className="w-full text-base border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-4 focus:ring-blue-200 focus:border-blue-500">{(f.o || []).map(o=><option key={o}>{o}</option>)}</select> : 
            <input name={f.n} type={f.t||'text'} required className="w-full text-base border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-4 focus:ring-blue-200 focus:border-blue-500" defaultValue={f.t==='date'?new Date().toISOString().split('T')[0]:''} placeholder="..."/>}
         </div>
       ))}
@@ -554,30 +629,68 @@ function AccessDenied() {
   );
 }
 
-function getIcon(v){ const i={dashboard:<LayoutDashboard size={18}/>,finance:<Wallet size={18}/>,expenses:<Receipt size={18}/>,users:<Users size={18}/>,'attendance-recap':<History size={18}/>,'attendance-input':<ClipboardList size={18}/>,'income-input':<PlusCircle size={18}/>,'user-mgmt':<Settings size={18}/>}; return i[v]||<Settings size={18}/>; }
-function getLabel(v){ const l={'attendance-recap':'Arsip','attendance-input':'Input Presensi','income-input':'Pemasukan','user-mgmt':'Admin Tools'}; return l[v] || v.replace('-',' ').toUpperCase(); }
+function getIcon(v){ 
+  const i={
+    dashboard:<LayoutDashboard size={18}/>,
+    finance:<Wallet size={18}/>,
+    expenses:<Receipt size={18}/>,
+    users:<Users size={18}/>,
+    'attendance-recap':<History size={18}/>,
+    'attendance-input':<ClipboardList size={18}/>,
+    'income-input':<PlusCircle size={18}/>,
+    'fine-input':<AlertCircle size={18}/>, 
+    'user-mgmt':<Settings size={18}/>
+  }; 
+  return i[v]||<Settings size={18}/>; 
+}
+
+function getLabel(v){ 
+  const l={
+    'attendance-recap':'Arsip',
+    'attendance-input':'Input Presensi',
+    'income-input':'Pemasukan',
+    'fine-input':'Input Denda', 
+    'user-mgmt':'Admin Tools'
+  }; 
+  return l[v] || v.replace('-',' ').toUpperCase(); 
+}
 
 // === 3. SUB-VIEWS PENGURUS ===
 
 function AdminDashboardView({ data, user, actions }) {
   const stats = useMemo(() => {
-    const incList = data.finance.filter(f => f.Status === 'Lunas');
-    const debtList = data.finance.filter(f => f.Status === 'Belum Lunas');
+    const safeFinance = data?.finance || [];
+    const safeExpenses = data?.expenses || [];
+
+    const incList = safeFinance.filter(f => f.Status === 'Lunas');
+    const debtList = safeFinance.filter(f => f.Status === 'Belum Lunas');
     
-    // Pisahkan Uang Kas dan Denda
-    const incDendaList = incList.filter(f => String(f.Kategori).toLowerCase().includes('denda'));
-    const incKasList = incList.filter(f => !String(f.Kategori).toLowerCase().includes('denda'));
+    const incDendaList = incList.filter(f => String(f.Kategori || '').toLowerCase().includes('denda'));
+    const incKasList = incList.filter(f => !String(f.Kategori || '').toLowerCase().includes('denda'));
 
-    const incKas = incKasList.reduce((a,b) => a+Number(b.Nominal), 0);
-    const incDenda = incDendaList.reduce((a,b) => a+Number(b.Nominal), 0);
-    const inc = incList.reduce((a,b) => a+Number(b.Nominal), 0);
-    const exp = data.expenses.reduce((a,b) => a+Number(b.Nominal), 0);
+    const incKas = incKasList.reduce((a,b) => a+Number(b.Nominal || 0), 0);
+    const incDenda = incDendaList.reduce((a,b) => a+Number(b.Nominal || 0), 0);
+    const inc = incList.reduce((a,b) => a+Number(b.Nominal || 0), 0);
+    const exp = safeExpenses.reduce((a,b) => a+Number(b.Nominal || 0), 0);
 
-    const debtDendaList = debtList.filter(f => String(f.Kategori).toLowerCase().includes('denda'));
-    const debtKasList = debtList.filter(f => !String(f.Kategori).toLowerCase().includes('denda'));
-    const debtKas = debtKasList.reduce((a,b) => a+Number(b.Nominal), 0);
-    const debtDenda = debtDendaList.reduce((a,b) => a+Number(b.Nominal), 0);
-    const debt = debtList.reduce((a,b) => a+Number(b.Nominal), 0);
+    const debtDendaList = debtList.filter(f => String(f.Kategori || '').toLowerCase().includes('denda'));
+    const debtKasList = debtList.filter(f => !String(f.Kategori || '').toLowerCase().includes('denda'));
+    const debtKas = debtKasList.reduce((a,b) => a+Number(b.Nominal || 0), 0);
+    const debtDenda = debtDendaList.reduce((a,b) => a+Number(b.Nominal || 0), 0);
+    const debt = debtList.reduce((a,b) => a+Number(b.Nominal || 0), 0);
+
+    const groupDebts = (list) => {
+      const groups = {};
+      list.forEach(item => {
+        const key = item.NamaSiswa || 'Tanpa Nama';
+        if (!groups[key]) {
+          groups[key] = { NamaSiswa: key, TotalNominal: 0, Details: [] };
+        }
+        groups[key].TotalNominal += Number(item.Nominal || 0);
+        groups[key].Details.push(item);
+      });
+      return Object.values(groups).sort((a, b) => b.TotalNominal - a.TotalNominal);
+    };
     
     const chartData = [
       { name: 'Kas Masuk', value: incKas },
@@ -586,11 +699,16 @@ function AdminDashboardView({ data, user, actions }) {
       { name: 'Piutang', value: debt }
     ];
     return { 
-      inc, incKas, incDenda, exp, debt, debtKas, debtDenda, bal: inc - exp, chartData, 
-      incCount: incList.length, debtCount: debtList.length, expCount: data.expenses.length,
+      inc, incKas, incDenda, exp, debt, debtKas, debtDenda, chartData, 
+      balKas: incKas - exp, 
+      balDenda: incDenda,   
+      incCount: incList.length, debtCount: debtList.length, expCount: safeExpenses.length,
       incKasCount: incKasList.length, incDendaCount: incDendaList.length,
       debtKasCount: debtKasList.length, debtDendaCount: debtDendaList.length,
-      unpaidList: debtList, paidList: incList, expenseList: data.expenses 
+      unpaidList: debtList, paidList: incList, expenseList: safeExpenses,
+      groupedDebtDendaList: groupDebts(debtDendaList),
+      groupedDebtKasList: groupDebts(debtKasList),
+      groupedUnpaidList: groupDebts(debtList)
     };
   }, [data]);
 
@@ -605,11 +723,12 @@ Tanggal: ${dateStr}
 
 *💰 ARUS KAS:*
 🟢 Pemasukan Uang Kas: Rp ${stats.incKas.toLocaleString('id-ID')}
-🟠 Pemasukan Denda: Rp ${stats.incDenda.toLocaleString('id-ID')}
-✨ *Total Masuk: Rp ${stats.inc.toLocaleString('id-ID')}*
 🔴 Total Pengeluaran: Rp ${stats.exp.toLocaleString('id-ID')}
 ------------------------
-🔵 *SALDO AKTIF: Rp ${stats.bal.toLocaleString('id-ID')}*
+🔵 *SALDO KAS AKTIF: Rp ${stats.balKas.toLocaleString('id-ID')}*
+
+*⚖️ DANA DENDA (TERPISAH):*
+🟡 Denda Terkumpul: Rp ${stats.balDenda.toLocaleString('id-ID')}
 
 *📝 TUNGGAKAN AKTIF:*
 - Tunggakan Kas: Rp ${stats.debtKas.toLocaleString('id-ID')} (${stats.debtKasCount} Item)
@@ -651,15 +770,16 @@ _Sistem Manajemen PMR SMANEL_`;
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-        <StatCard label="Saldo Kas" val={stats.bal} color="blue" icon={<Wallet size={16}/>} />
-        <StatCard label="Masuk (Kas)" val={stats.incKas} color="green" icon={<TrendingUp size={16}/>} />
-        <StatCard label="Masuk (Denda)" val={stats.incDenda} color="green" icon={<Coins size={16}/>} />
+        <StatCard label="Saldo Kas Aktif" val={stats.balKas} color="blue" icon={<Wallet size={16}/>} />
+        <StatCard label="Saldo Denda" val={stats.balDenda} color="yellow" icon={<Coins size={16}/>} />
+        <StatCard label="Pemasukan Kas" val={stats.incKas} color="green" icon={<TrendingUp size={16}/>} />
         <StatCard label="Tunggakan (Kas)" val={stats.debtKas} color="orange" icon={<AlertCircle size={16}/>} />
         <StatCard label="Tunggakan (Denda)" val={stats.debtDenda} color="red" icon={<AlertCircle size={16}/>} />
         <StatCard label="Pengeluaran" val={stats.exp} color="red" icon={<TrendingDown size={16}/>} />
       </div>
       
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Kolom 1: Diagram Keuangan */}
         <div className="bg-white border border-gray-300 rounded shadow-sm">
           <div className="bg-gray-100 px-4 py-3 border-b border-gray-300 font-semibold text-gray-700">Diagram Keuangan</div>
           <div className="h-64 w-full p-4">
@@ -668,7 +788,7 @@ _Sistem Manajemen PMR SMANEL_`;
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#dee2e6" />
                 <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={{stroke: '#ced4da'}} />
                 <YAxis fontSize={12} tickLine={false} axisLine={false} tickFormatter={(val) => `Rp${val/1000}k`} />
-                <Tooltip formatter={(value) => `Rp ${value.toLocaleString('id-ID')}`} cursor={{fill: '#f8f9fa'}} contentStyle={{fontSize: '12px', borderRadius: '4px'}} />
+                <Tooltip formatter={(value) => `Rp ${Number(value || 0).toLocaleString('id-ID')}`} cursor={{fill: '#f8f9fa'}} contentStyle={{fontSize: '12px', borderRadius: '4px'}} />
                 <Bar dataKey="value" radius={[4, 4, 0, 0]}>
                   {stats.chartData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={CHART_COLORS[index % 20]} />
@@ -679,34 +799,18 @@ _Sistem Manajemen PMR SMANEL_`;
           </div>
         </div>
 
-        <div className="bg-white border border-gray-300 rounded shadow-sm flex flex-col">
-          <div className="bg-gray-100 px-4 py-3 border-b border-gray-300 font-semibold text-gray-700">Rincian Total Transaksi</div>
-          <div className="p-4 flex-1">
-             <ul className="list-none border border-gray-300 rounded p-0 m-0">
-                <li className="border-b border-gray-300 px-4 py-3 flex justify-between items-center bg-white hover:bg-gray-50">
-                  <span className="font-medium text-gray-700">Uang Kas Masuk</span>
-                  <span className="bg-green-600 text-white text-xs px-2 py-1 rounded">{stats.incKasCount} Record</span>
-                </li>
-                <li className="border-b border-gray-300 px-4 py-3 flex justify-between items-center bg-white hover:bg-gray-50">
-                  <span className="font-medium text-gray-700">Uang Denda Masuk</span>
-                  <span className="bg-green-600 text-white text-xs px-2 py-1 rounded">{stats.incDendaCount} Record</span>
-                </li>
-                <li className="border-b border-gray-300 px-4 py-3 flex justify-between items-center bg-white hover:bg-gray-50">
-                  <span className="font-medium text-gray-700">Tunggakan Kas</span>
-                  <span className="bg-orange-500 text-white text-xs px-2 py-1 rounded">{stats.debtKasCount} Record</span>
-                </li>
-                <li className="border-b border-gray-300 px-4 py-3 flex justify-between items-center bg-white hover:bg-gray-50">
-                  <span className="font-medium text-gray-700">Tunggakan Denda</span>
-                  <span className="bg-red-500 text-white text-xs px-2 py-1 rounded">{stats.debtDendaCount} Record</span>
-                </li>
-                <li className="px-4 py-3 flex justify-between items-center bg-white hover:bg-gray-50">
-                  <span className="font-medium text-gray-700">Pengeluaran Operasional</span>
-                  <span className="bg-red-600 text-white text-xs px-2 py-1 rounded">{stats.expCount} Record</span>
-                </li>
+        {/* Kolom 2: Daftar Tunggakan Aktif */}
+        <div className="bg-white border border-gray-300 rounded shadow-sm flex flex-col h-[380px]">
+          <div className="bg-gray-100 px-4 py-3 border-b border-gray-300 font-semibold flex justify-between items-center">
+             <div className="flex items-center gap-2"><AlertCircle size={16} className="text-yellow-600"/> Daftar Tunggakan Aktif</div>
+             <span className="bg-yellow-500 text-white text-xs px-2 py-1 rounded">{stats.groupedUnpaidList.length} Anak</span>
+          </div>
+          <div className="p-0 flex-1 overflow-y-auto h-72">
+             <ul className="divide-y divide-gray-200 m-0">
+               {stats.groupedUnpaidList.length > 0 ? stats.groupedUnpaidList.map((item, i) => (
+                 <GroupedDebtItem key={i} item={item} />
+               )) : <li className="p-8 text-center text-gray-500 text-sm">Semua anggota bebas tunggakan.</li>}
              </ul>
-             <div className="mt-4 pt-4 border-t border-gray-200">
-               <p className="text-sm text-gray-600">Total Anggota Terdaftar: <span className="font-bold text-gray-800">{data.students.length} Siswa</span></p>
-             </div>
           </div>
         </div>
       </div>
@@ -719,13 +823,16 @@ function AttendanceRecapView({ history, onPost }) {
   const [filterStatus, setFilterStatus] = useState('Semua');
   const [editModal, setEditModal] = useState({ show: false, record: null });
 
+  const activeDate = filterDate || (history && history.length > 0 ? history[0].Tanggal : '');
+
   const filteredRows = useMemo(() => {
+    if (!history) return [];
     return history.filter(h => {
-      const matchDate = !filterDate || h.Tanggal === filterDate;
+      const matchDate = h.Tanggal === activeDate;
       const matchStatus = filterStatus === 'Semua' || h.Status === filterStatus;
       return matchDate && matchStatus;
     });
-  }, [history, filterDate, filterStatus]);
+  }, [history, activeDate, filterStatus]);
 
   const handleUpdateStatus = (e) => {
     e.preventDefault();
@@ -744,7 +851,6 @@ function AttendanceRecapView({ history, onPost }) {
   return (
     <div className="space-y-4 animate-fade-in">
       <div className="flex flex-wrap items-center gap-3">
-        {/* Keterangan Status */}
         <div className="flex gap-2 mr-auto bg-white p-2 rounded border border-gray-300 shadow-sm text-xs">
            <span className="font-bold text-gray-500 mr-1">Keterangan:</span>
            {STATUS_OPTIONS.map(opt => (
@@ -758,8 +864,7 @@ function AttendanceRecapView({ history, onPost }) {
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex items-center gap-2 bg-white p-2 rounded border border-gray-300 shadow-sm w-fit">
           <Calendar size={16} className="text-gray-500 ml-2" />
-          <input type="date" className="text-sm text-gray-700 outline-none" value={filterDate} onChange={(e) => setFilterDate(e.target.value)} />
-          {filterDate && <button onClick={() => setFilterDate('')} className="text-gray-500 hover:bg-gray-200 p-1 rounded"><X size={14} /></button>}
+          <input type="date" className="text-sm text-gray-700 outline-none" value={activeDate} onChange={(e) => setFilterDate(e.target.value)} title="Pilih tanggal kegiatan" />
         </div>
         <div className="flex items-center gap-2 bg-white p-2 rounded border border-gray-300 shadow-sm w-fit">
           <Filter size={16} className="text-gray-500 ml-2" />
@@ -772,8 +877,8 @@ function AttendanceRecapView({ history, onPost }) {
 
       <div className="bg-white rounded border border-gray-300 shadow-sm overflow-hidden flex flex-col">
         <div className="bg-gray-100 px-4 py-3 border-b border-gray-300 font-semibold text-gray-700 flex justify-between items-center">
-          <span>Arsip Presensi</span>
-          <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Total: {filteredRows.length} Data</span>
+          <span>Arsip Presensi <span className="font-normal text-sm text-gray-500">({activeDate})</span></span>
+          <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Ditampilkan: {filteredRows.length} Data</span>
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm whitespace-nowrap">
@@ -844,7 +949,7 @@ function FinanceView({ data, user, onPost }) {
   const [selected, setSelected] = useState([]);
   const [confirmMsg, setConfirmMsg] = useState(null); 
   
-  const unpaid = useMemo(() => data.filter(f => f.Status === 'Belum Lunas'), [data]);
+  const unpaid = useMemo(() => (data || []).filter(f => f.Status === 'Belum Lunas'), [data]);
 
   const toggleSelect = (id) => setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   const toggleSelectAll = () => setSelected(selected.length === unpaid.length && unpaid.length > 0 ? [] : unpaid.map(f => f.IDTransaksi));
@@ -880,7 +985,7 @@ function FinanceView({ data, user, onPost }) {
       <div className="bg-white rounded border border-gray-300 shadow-sm overflow-hidden">
         <div className="bg-gray-100 p-3 border-b border-gray-300 flex justify-between items-center">
           <h3 className="text-sm font-semibold text-gray-700">Monitor Tunggakan Aktif ({unpaid.length})</h3>
-          {user.role === ROLES.BENDAHARA && (
+          {user?.role === ROLES.BENDAHARA && (
             <div className="flex gap-2">
               {selected.length > 0 && (
                 <button onClick={handleBulkPay} className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded text-sm transition-colors flex items-center gap-1 border border-green-700"><CheckSquare size={14}/> Bayar ({selected.length})</button>
@@ -906,7 +1011,7 @@ function FinanceView({ data, user, onPost }) {
                   <td className="px-4 py-2 text-center"><input type="checkbox" checked={selected.includes(f.IDTransaksi)} onChange={() => toggleSelect(f.IDTransaksi)} className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"/></td>
                   <td className="px-4 py-2 font-medium text-gray-800">{f.NamaSiswa}<div className="text-xs text-gray-500 font-normal">{f.Tanggal}</div></td>
                   <td className="px-4 py-2"><span className="bg-yellow-100 text-yellow-800 border border-yellow-200 px-2 py-1 rounded text-xs">{f.Kategori}</span></td>
-                  <td className="px-4 py-2 font-medium text-right text-red-600">Rp {Number(f.Nominal).toLocaleString('id-ID')}</td>
+                  <td className="px-4 py-2 font-medium text-right text-red-600">Rp {Number(f.Nominal || 0).toLocaleString('id-ID')}</td>
                   <td className="px-4 py-2 text-center"><span className="text-red-500 font-medium text-xs">Belum Lunas</span></td>
                 </tr>
               ))}
@@ -922,36 +1027,119 @@ function FinanceView({ data, user, onPost }) {
 function ExpenseView({ data, user, onPost }) {
   const [showAdd, setShowAdd] = useState(false);
   const [confirmMsg, setConfirmMsg] = useState(null);
+  const [selected, setSelected] = useState([]);
 
-  const handleClear = () => { 
+  // Logika Checkbox
+  const toggleSelect = (item) => {
+    const id = `${item.Tanggal}|${item.Deskripsi}|${item.Kategori}|${item.Nominal}`;
+    setSelected(prev => prev.some(x => x.id === id) ? prev.filter(x => x.id !== id) : [...prev, {id, ...item}]);
+  };
+
+  const toggleSelectAll = () => {
+    if (selected.length === (data || []).length && (data || []).length > 0) {
+      setSelected([]);
+    } else {
+      setSelected((data || []).map(item => ({ id: `${item.Tanggal}|${item.Deskripsi}|${item.Kategori}|${item.Nominal}`, ...item })));
+    }
+  };
+
+  const handleDeleteSelected = () => {
+    if (selected.length === 0) return;
     setConfirmMsg({
-      title: "Hapus Log Pengeluaran",
-      message: "Yakin ingin menghapus semua riwayat pengeluaran kas dari Spreadsheet?",
+      title: "Hapus Pengeluaran Terpilih",
+      message: `Yakin ingin menghapus ${selected.length} data pengeluaran yang dipilih secara permanen dari Spreadsheet?`,
       onConfirm: () => {
-        onPost('clearData', {target:'expense'}, "Log pengeluaran dibersihkan."); 
+        onPost('deleteExpenses', { items: selected.map(s => ({ tgl: s.Tanggal, desc: s.Deskripsi, kat: s.Kategori, nom: s.Nominal })) }, `${selected.length} data pengeluaran dihapus.`);
+        setSelected([]);
         setConfirmMsg(null);
       }
     });
   };
-  
+
+  const handleClearAll = () => {
+    setConfirmMsg({
+      title: "Hapus Semua Pengeluaran",
+      message: "Yakin ingin menghapus SEMUA riwayat pengeluaran kas secara permanen dari Spreadsheet?",
+      onConfirm: () => {
+        onPost('clearData', {target:'expense'}, "Semua log pengeluaran dibersihkan.");
+        setSelected([]);
+        setConfirmMsg(null);
+      }
+    });
+  };
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 animate-fade-in">
       {confirmMsg && <ConfirmModal title={confirmMsg.title} message={confirmMsg.message} onConfirm={confirmMsg.onConfirm} onCancel={() => setConfirmMsg(null)} />}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-white rounded border border-gray-300 shadow-sm p-5 border-l-4 border-l-red-500">
+      
+      <div className="bg-white rounded border border-gray-300 shadow-sm p-5 border-l-4 border-l-red-500 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
           <p className="text-sm font-semibold text-gray-500 mb-1">Total Pengeluaran</p>
-          <h2 className="text-2xl font-bold text-gray-800">Rp {data.reduce((a,b)=>a+Number(b.Nominal),0).toLocaleString('id-ID')}</h2>
+          <h2 className="text-2xl font-bold text-gray-800">Rp {(data || []).reduce((a,b)=>a+Number(b.Nominal || 0),0).toLocaleString('id-ID')}</h2>
         </div>
-        {user.role === ROLES.BENDAHARA && (
-          <div className="flex gap-2">
-            <button onClick={() => setShowAdd(true)} className="flex-1 bg-white border border-gray-300 rounded shadow-sm flex items-center justify-center gap-2 text-blue-600 hover:bg-gray-50 font-medium text-sm transition-colors"><PlusCircle size={18}/> Catat Baru</button>
-            <button onClick={handleClear} disabled={data.length === 0} className={`flex-1 rounded shadow-sm flex items-center justify-center gap-2 font-medium text-sm border transition-colors ${data.length === 0 ? 'bg-gray-50 text-gray-400 border-gray-300 cursor-not-allowed' : 'bg-red-50 border-red-200 text-red-600 hover:bg-red-100'}`}><Trash2 size={18}/> Clear Log</button>
-          </div>
-        )}
       </div>
+
       <div className="bg-white rounded border border-gray-300 shadow-sm overflow-hidden">
-        <div className="bg-gray-100 p-3 border-b border-gray-300"><h3 className="text-sm font-semibold text-gray-700">Audit Pengeluaran</h3></div>
-        <GenericTableInner headers={['Tanggal','Deskripsi','Nominal']} rows={data} />
+        <div className="bg-gray-100 p-3 border-b border-gray-300 flex flex-col sm:flex-row justify-between items-center gap-3">
+          <h3 className="text-sm font-semibold text-gray-700">Audit Pengeluaran</h3>
+          {user?.role === ROLES.BENDAHARA && (
+            <div className="flex flex-wrap gap-2">
+              {selected.length > 0 && (
+                <button onClick={handleDeleteSelected} className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded text-xs transition-colors flex items-center gap-1 border border-red-700 shadow-sm font-medium whitespace-nowrap"><Trash2 size={14}/> Hapus Terpilih ({selected.length})</button>
+              )}
+              <button onClick={() => setShowAdd(true)} className="bg-white border border-gray-300 text-blue-600 hover:bg-blue-50 px-3 py-1.5 rounded text-xs transition-colors flex items-center gap-1 shadow-sm font-medium whitespace-nowrap"><PlusCircle size={14}/> Catat Baru</button>
+              {data && data.length > 0 && (
+                <button onClick={handleClearAll} className="bg-white hover:bg-red-50 text-red-600 px-3 py-1.5 rounded text-xs transition-colors flex items-center gap-1 border border-red-200 shadow-sm font-medium whitespace-nowrap"><Trash2 size={14}/> Bersihkan Semua</button>
+              )}
+            </div>
+          )}
+        </div>
+        <div className="overflow-x-auto max-h-[600px]">
+          <table className="min-w-full text-left text-sm whitespace-nowrap relative">
+            <thead className="sticky top-0 z-10 bg-white shadow-sm">
+              <tr className="bg-gray-100 border-b border-gray-300 text-gray-700">
+                <th className="px-4 py-3 w-10 text-center"><input type="checkbox" checked={data && data.length > 0 && selected.length === data.length} onChange={toggleSelectAll} className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"/></th>
+                <th className="px-4 py-3 font-semibold">Tanggal</th>
+                <th className="px-4 py-3 font-semibold">Deskripsi / Item</th>
+                <th className="px-4 py-3 font-semibold">Kategori</th>
+                <th className="px-4 py-3 text-right font-semibold">Nominal</th>
+                {user?.role === ROLES.BENDAHARA && <th className="px-4 py-3 text-center font-semibold">Aksi</th>}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {data && data.length > 0 ? data.map((item, i) => {
+                const uniqueId = `${item.Tanggal}|${item.Deskripsi}|${item.Kategori}|${item.Nominal}`;
+                const isSelected = selected.some(s => s.id === uniqueId);
+                return (
+                  <tr key={i} className={`hover:bg-gray-50 transition-colors ${isSelected ? 'bg-blue-50/50' : 'even:bg-gray-50/50'}`}>
+                    <td className="px-4 py-2 text-center"><input type="checkbox" checked={isSelected} onChange={() => toggleSelect(item)} className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"/></td>
+                    <td className="px-4 py-2 text-gray-600">{item.Tanggal}</td>
+                    <td className="px-4 py-2 font-medium text-gray-800 uppercase">{item.Deskripsi}</td>
+                    <td className="px-4 py-2"><span className="px-2 py-1 rounded text-xs border font-medium bg-gray-100 text-gray-700 border-gray-200">{item.Kategori}</span></td>
+                    <td className="px-4 py-2 font-medium text-right text-red-600">- Rp {Number(item.Nominal || 0).toLocaleString('id-ID')}</td>
+                    {user?.role === ROLES.BENDAHARA && (
+                      <td className="px-4 py-2 text-center">
+                        <button onClick={() => {
+                          setConfirmMsg({
+                            title: "Hapus Pengeluaran",
+                            message: "Yakin ingin menghapus data pengeluaran ini?",
+                            onConfirm: () => {
+                              onPost('deleteExpenses', { items: [{ tgl: item.Tanggal, desc: item.Deskripsi, kat: item.Kategori, nom: item.Nominal }] }, "Pengeluaran berhasil dihapus.");
+                              setSelected(prev => prev.filter(x => x.id !== uniqueId));
+                              setConfirmMsg(null);
+                            }
+                          });
+                        }} className="btn btn-sm bg-red-100 text-red-700 hover:bg-red-200 px-2 py-1 rounded border border-red-200" title="Hapus Data">
+                          <Trash2 size={14} />
+                        </button>
+                      </td>
+                    )}
+                  </tr>
+                );
+              }) : <tr><td colSpan={user?.role === ROLES.BENDAHARA ? "6" : "5"} className="p-8 text-center text-gray-500 text-sm">Belum ada data pengeluaran.</td></tr>}
+            </tbody>
+          </table>
+        </div>
       </div>
       {showAdd && <ModalForm title="Input Pengeluaran" onClose={() => setShowAdd(false)} onSubmit={(d) => { onPost('addExpense', d, "Pengeluaran berhasil dicatat."); setShowAdd(false); }} fields={[{n:'tanggal',t:'date'},{n:'deskripsi',l:'Item'},{n:'kategori',t:'select',o:['Operasional','Logistik','Konsumsi','Lainnya']},{n:'nominal',t:'number'}]} />}
     </div>
@@ -961,7 +1149,7 @@ function ExpenseView({ data, user, onPost }) {
 function AttendanceInputView({ students, onPost, showToast }) {
   const [form, setForm] = useState({ tanggal: new Date().toISOString().split('T')[0], kegiatan: '', filter: 'Semua' });
   const [att, setAtt] = useState({});
-  const filtered = students.filter(s => form.filter === 'Semua' || s.Kelas === form.filter);
+  const filtered = useMemo(() => (students || []).filter(s => form.filter === 'Semua' || s.Kelas === form.filter), [students, form.filter]);
 
   const handleSubmit = () => {
     if (!form.kegiatan) return showToast("Harap isi Judul/Nama Kegiatan!", "error");
@@ -995,12 +1183,12 @@ function AttendanceInputView({ students, onPost, showToast }) {
       <div className="bg-white rounded border border-gray-300 shadow-sm overflow-hidden flex flex-col">
         <div className="bg-gray-100 p-3 border-b border-gray-300 flex justify-between items-center">
           <h3 className="text-sm font-semibold text-gray-700">Presensi ({filtered.length} Anggota)</h3>
-          <select value={form.filter} onChange={e => setForm({...form, filter: e.target.value})} className="text-sm border border-gray-300 rounded px-2 py-1 bg-white focus:outline-none focus:ring-4 focus:ring-blue-200"><option>Semua</option>{[...new Set(students.map(s => s.Kelas))].map(k => <option key={k}>{k}</option>)}</select>
+          <select value={form.filter} onChange={e => setForm({...form, filter: e.target.value})} className="text-sm border border-gray-300 rounded px-2 py-1 bg-white focus:outline-none focus:ring-4 focus:ring-blue-200"><option>Semua</option>{[...new Set((students || []).map(s => s.Kelas))].map(k => <option key={k}>{k}</option>)}</select>
         </div>
         <div className="p-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 max-h-[500px] overflow-y-auto">
           {filtered.map((s, i) => (
             <div key={i} className="p-3 border border-gray-300 rounded hover:shadow-sm transition-shadow">
-              <div className="flex justify-between items-center mb-3"><span className="font-semibold text-sm text-gray-800 truncate uppercase">{s.NamaLengkap}</span><span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded border border-gray-200">{s.Kelas}</span></div>
+              <div className="flex justify-between items-center mb-3"><span className="font-semibold text-sm text-gray-800 truncate uppercase">{s.NamaLengkap || 'Tanpa Nama'}</span><span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded border border-gray-200">{s.Kelas}</span></div>
               <div className="flex gap-1">{STATUS_OPTIONS.map(o => <button key={o.id} onClick={() => setAtt({...att, [s.NamaLengkap]: o.id})} className={`flex-1 py-1 text-xs font-medium rounded border transition-colors ${att[s.NamaLengkap]===o.id || (!att[s.NamaLengkap]&&o.id==='Hadir') ? 'bg-blue-600 text-white border-blue-700 shadow-sm' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-100'}`}>{o.alias}</button>)}</div>
             </div>
           ))}
@@ -1015,7 +1203,7 @@ function IncomeInputView({ data, user, onPost }) {
   const [selected, setSelected] = useState([]);
   const [confirmMsg, setConfirmMsg] = useState(null);
 
-  const paid = useMemo(() => data.filter(f => f.Status === 'Lunas'), [data]);
+  const paid = useMemo(() => (data || []).filter(f => f.Status === 'Lunas'), [data]);
 
   const toggleSelect = (id) => setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   const toggleSelectAll = () => setSelected(selected.length === paid.length && paid.length > 0 ? [] : paid.map(f => f.IDTransaksi));
@@ -1073,7 +1261,7 @@ function IncomeInputView({ data, user, onPost }) {
       <div className="bg-white rounded border border-gray-300 shadow-sm overflow-hidden">
         <div className="bg-gray-100 p-3 border-b border-gray-300 flex flex-col sm:flex-row justify-between items-center gap-3">
           <h3 className="text-sm font-semibold text-gray-700">Log Pemasukan (Kas & Denda)</h3>
-          {user.role === ROLES.BENDAHARA && (
+          {user?.role === ROLES.BENDAHARA && (
             <div className="flex gap-2">
               {selected.length > 0 && (
                 <button onClick={handleDeleteSelected} className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded text-xs transition-colors flex items-center gap-1 border border-red-700"><Trash2 size={14}/> Hapus Terpilih ({selected.length})</button>
@@ -1102,8 +1290,8 @@ function IncomeInputView({ data, user, onPost }) {
                   <td className="px-4 py-2 text-center"><input type="checkbox" checked={selected.includes(f.IDTransaksi)} onChange={() => toggleSelect(f.IDTransaksi)} className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"/></td>
                   <td className="px-4 py-2 text-gray-600">{f.Tanggal}</td>
                   <td className="px-4 py-2 font-medium text-gray-800 uppercase">{f.NamaSiswa}</td>
-                  <td className="px-4 py-2"><span className={`px-2 py-1 rounded text-xs border font-medium ${String(f.Kategori).toLowerCase().includes('denda') ? 'bg-orange-50 text-orange-700 border-orange-200' : 'bg-green-50 text-green-700 border-green-200'}`}>{f.Kategori}</span></td>
-                  <td className="px-4 py-2 font-medium text-right text-green-600">+ Rp {Number(f.Nominal).toLocaleString('id-ID')}</td>
+                  <td className="px-4 py-2"><span className={`px-2 py-1 rounded text-xs border font-medium ${String(f.Kategori || '').toLowerCase().includes('denda') ? 'bg-orange-50 text-orange-700 border-orange-200' : 'bg-green-50 text-green-700 border-green-200'}`}>{f.Kategori}</span></td>
+                  <td className="px-4 py-2 font-medium text-right text-green-600">+ Rp {Number(f.Nominal || 0).toLocaleString('id-ID')}</td>
                   <td className="px-4 py-2 text-center">
                     <button onClick={() => handleDeleteSingle(f.IDTransaksi)} className="btn btn-sm bg-red-100 text-red-700 hover:bg-red-200 px-2 py-1 rounded border border-red-200" title="Hapus Data Pemasukan dari Spreadsheet">
                       <Trash2 size={14} />
@@ -1119,6 +1307,71 @@ function IncomeInputView({ data, user, onPost }) {
   );
 }
 
+// === TAMBAHAN: KOMPONEN INPUT DENDA ===
+function FineInputView({ students, onPost }) {
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    const keterangan = formData.get('kategori');
+    
+    onPost('addIncome', {
+      tanggal: formData.get('tanggal'),
+      nama: formData.get('nama'),
+      kategori: `Denda (${keterangan})`, // Format agar otomatis masuk ke Denda
+      nominal: Number(formData.get('nominal')),
+      status: formData.get('status'),
+      via: formData.get('status') === 'Lunas' ? 'Tunai' : '-'
+    }, "Data Denda berhasil dicatat");
+  };
+
+  return (
+    <div className="max-w-lg mx-auto bg-white rounded border border-gray-300 shadow-sm overflow-hidden animate-fade-in">
+      <div className="bg-orange-50 p-4 border-b border-orange-200 font-semibold text-orange-800 flex items-center gap-2">
+        <AlertCircle size={18}/> Form Pencatatan Denda Manual
+      </div>
+      <div className="p-6">
+        <p className="text-sm text-gray-600 mb-5">
+          Gunakan form ini untuk mencatat denda di luar presensi otomatis. Anda bisa memasukkannya sebagai <strong>tunggakan</strong> atau <strong>langsung dibayar lunas</strong>.
+        </p>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-1">
+            <label className="block text-sm font-medium text-gray-700">Tanggal Pencatatan</label>
+            <input type="date" name="tanggal" required defaultValue={new Date().toISOString().split('T')[0]} className="w-full border border-gray-300 rounded px-3 py-2 text-base focus:ring-4 focus:ring-blue-200 focus:border-blue-500 outline-none" />
+          </div>
+          <div className="space-y-1">
+            <label className="block text-sm font-medium text-gray-700">Nama Anggota Pelanggar</label>
+            <select name="nama" required className="w-full border border-gray-300 rounded px-3 py-2 text-base focus:ring-4 focus:ring-blue-200 focus:border-blue-500 outline-none uppercase">
+              {(students || []).map((s, i) => <option key={i} value={s.NamaLengkap}>{s.NamaLengkap || 'Tanpa Nama'}</option>)}
+            </select>
+          </div>
+          <div className="space-y-1">
+            <label className="block text-sm font-medium text-gray-700">Jenis Pelanggaran / Denda</label>
+            <select name="kategori" required className="w-full border border-gray-300 rounded px-3 py-2 text-base focus:ring-4 focus:ring-blue-200 focus:border-blue-500 outline-none">
+              <option value="Sakit">Sakit</option>
+              <option value="Izin">Izin</option>
+              <option value="Alpha">Alpha</option>
+            </select>
+          </div>
+          <div className="space-y-1">
+            <label className="block text-sm font-medium text-gray-700">Nominal Denda (Rp)</label>
+            <input type="number" name="nominal" required placeholder="Contoh: 5000" className="w-full border border-gray-300 rounded px-3 py-2 text-base focus:ring-4 focus:ring-blue-200 focus:border-blue-500 outline-none" />
+          </div>
+          <div className="space-y-1">
+            <label className="block text-sm font-medium text-gray-700">Status Pembayaran</label>
+            <select name="status" required className="w-full border border-gray-300 rounded px-3 py-2 text-base focus:ring-4 focus:ring-blue-200 focus:border-blue-500 outline-none">
+              <option value="Belum Lunas">Belum Lunas (Masukkan ke Tunggakan)</option>
+              <option value="Lunas">Langsung Lunas (Dibayar Tunai Hari Ini)</option>
+            </select>
+          </div>
+          <button type="submit" className="w-full bg-orange-600 hover:bg-orange-700 border border-orange-700 text-white py-2.5 rounded font-medium focus:ring-4 focus:ring-orange-200 transition-colors mt-2">
+            Simpan Catatan Denda
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 function StudentListView({ students, onPost }) {
   const [search, setSearch] = useState('');
   const [classFilter, setClassFilter] = useState('Semua');
@@ -1126,8 +1379,8 @@ function StudentListView({ students, onPost }) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [confirmMsg, setConfirmMsg] = useState(null);
 
-  const classes = useMemo(() => ['Semua', ...new Set(students.map(s => s.Kelas))], [students]);
-  const filtered = useMemo(() => students.filter(s => classFilter === 'Semua' || s.Kelas === classFilter).filter(s => s.NamaLengkap.toLowerCase().includes(search.toLowerCase())), [students, search, classFilter]);
+  const classes = useMemo(() => ['Semua', ...new Set((students || []).map(s => s.Kelas))], [students]);
+  const filtered = useMemo(() => (students || []).filter(s => classFilter === 'Semua' || s.Kelas === classFilter).filter(s => String(s.NamaLengkap || '').toLowerCase().includes(search.toLowerCase())), [students, search, classFilter]);
   
   const handleUpdate = (e) => { 
     e.preventDefault(); 
@@ -1176,7 +1429,7 @@ function StudentListView({ students, onPost }) {
           <tbody className="divide-y divide-gray-200">
             {filtered.length > 0 ? filtered.map((s, i) => (
               <tr key={i} className="hover:bg-gray-50 even:bg-gray-50/50">
-                <td className="px-4 py-2 font-medium text-gray-800 uppercase">{s.NamaLengkap}</td>
+                <td className="px-4 py-2 font-medium text-gray-800 uppercase">{s.NamaLengkap || 'Tanpa Nama'}</td>
                 <td className="px-4 py-2 text-gray-600">{s.Kelas}</td>
                 <td className="px-4 py-2 flex justify-center gap-2">
                   <button onClick={() => setEditModal({ show: true, student: s })} className="btn btn-sm bg-blue-100 text-blue-700 hover:bg-blue-200 px-2 py-1 rounded border border-blue-200"><Edit2 size={14} /></button>
@@ -1242,7 +1495,7 @@ function UserManagementView({ users, onPost }) {
   const [form, setForm] = useState({ u: '', p: '' });
   const handleUpdate = (role, u, p) => { onPost('updateUser', { role, username: u, password: p }, "Otoritas akun diperbarui"); setEdit(null); };
   return (
-    <div className="bg-white rounded border border-gray-300 shadow-sm flex flex-col"><div className="bg-gray-100 p-3 border-b border-gray-300 flex items-center gap-2 font-semibold text-gray-700"><ShieldCheck size={18} className="text-blue-600" />Konfigurasi Otoritas Login</div><div className="divide-y divide-gray-200">{users.map(u => (<div key={u.Role} className="p-4 flex flex-col md:flex-row justify-between items-center gap-4 hover:bg-gray-50"><div className="text-center md:text-left"><p className="text-sm font-semibold text-gray-800">{u.Role}</p><p className="text-xs text-gray-500">@{u.Username}</p></div>{edit === u.Role ? (<div className="flex flex-wrap gap-2 justify-center w-full md:w-auto"><input type="text" value={form.u} onChange={e => setForm({...form, u: e.target.value})} className="px-3 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 w-32" /><input type="text" value={form.p} onChange={e => setForm({...form, p: e.target.value})} className="px-3 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 w-32" /><button onClick={() => handleUpdate(u.Role, form.u, form.p)} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded text-sm transition-colors border border-blue-700">Simpan</button></div>) : (<button onClick={() => { setEdit(u.Role); setForm({ u: u.Username, p: u.Password }); }} className="bg-white border border-gray-300 text-gray-700 px-4 py-1.5 rounded text-sm hover:bg-gray-100 transition-colors">Ubah Kredensial</button>)}</div>))}</div></div>
+    <div className="bg-white rounded border border-gray-300 shadow-sm flex flex-col"><div className="bg-gray-100 p-3 border-b border-gray-300 flex items-center gap-2 font-semibold text-gray-700"><ShieldCheck size={18} className="text-blue-600" />Konfigurasi Otoritas Login</div><div className="divide-y divide-gray-200">{(users || []).map(u => (<div key={u.Role} className="p-4 flex flex-col md:flex-row justify-between items-center gap-4 hover:bg-gray-50"><div className="text-center md:text-left"><p className="text-sm font-semibold text-gray-800">{u.Role}</p><p className="text-xs text-gray-500">@{u.Username}</p></div>{edit === u.Role ? (<div className="flex flex-wrap gap-2 justify-center w-full md:w-auto"><input type="text" value={form.u} onChange={e => setForm({...form, u: e.target.value})} className="px-3 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 w-32" /><input type="text" value={form.p} onChange={e => setForm({...form, p: e.target.value})} className="px-3 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 w-32" /><button onClick={() => handleUpdate(u.Role, form.u, form.p)} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded text-sm transition-colors border border-blue-700">Simpan</button></div>) : (<button onClick={() => { setEdit(u.Role); setForm({ u: u.Username, p: u.Password }); }} className="bg-white border border-gray-300 text-gray-700 px-4 py-1.5 rounded text-sm hover:bg-gray-100 transition-colors">Ubah Kredensial</button>)}</div>))}</div></div>
   );
 }
 
@@ -1253,6 +1506,7 @@ function ContentRouter({ view, user, data, actions }) {
     case 'dashboard': return <AdminDashboardView data={data} user={user} actions={actions} />;
     case 'attendance-input': return hasAccess([ROLES.SEKRETARIS]) ? <AttendanceInputView students={data.students} onPost={actions.genericPost} showToast={actions.showToast} /> : <AccessDenied />;
     case 'income-input': return hasAccess([ROLES.BENDAHARA]) ? <IncomeInputView data={data.finance} user={user} onPost={actions.genericPost} /> : <AccessDenied />;
+    case 'fine-input': return hasAccess([ROLES.BENDAHARA]) ? <FineInputView students={data.students} onPost={actions.genericPost} /> : <AccessDenied />;
     case 'finance': return hasAccess([ROLES.ADMIN, ROLES.BENDAHARA]) ? <FinanceView data={data.finance} user={user} onPost={actions.genericPost} /> : <AccessDenied />;
     case 'expenses': return hasAccess([ROLES.ADMIN, ROLES.BENDAHARA]) ? <ExpenseView data={data.expenses} user={user} onPost={actions.genericPost} /> : <AccessDenied />;
     case 'attendance-recap': return <AttendanceRecapView history={data.history} onPost={actions.genericPost} />;
@@ -1315,7 +1569,7 @@ export default function App() {
   
   const handleLogin = (u, p) => { 
     setLoginError('');
-    const v = appUsers.find(x => String(x.Username).toLowerCase()===String(u).toLowerCase() && String(x.Password)===String(p)); 
+    const v = appUsers.find(x => String(x.Username || '').toLowerCase() === String(u || '').toLowerCase() && String(x.Password) === String(p)); 
     if(v){ 
       setUser({role:v.Role, name:v.Username}); 
       setView(v.Role===ROLES.SEKRETARIS?'attendance-input':v.Role===ROLES.BENDAHARA?'finance':'dashboard'); 
@@ -1369,7 +1623,7 @@ export default function App() {
           <div className="p-2 space-y-1 overflow-y-auto h-full">
             {user.role===ROLES.ADMIN && ['dashboard','attendance-recap','finance','expenses','users','user-mgmt'].map(v=><SidebarLink key={v} active={view===v} onClick={()=>{setView(v);setIsMenuOpen(false)}} icon={getIcon(v)} label={getLabel(v)}/>)}
             {user.role===ROLES.SEKRETARIS && ['attendance-input','attendance-recap','users'].map(v=><SidebarLink key={v} active={view===v} onClick={()=>{setView(v);setIsMenuOpen(false)}} icon={getIcon(v)} label={getLabel(v)}/>)}
-            {user.role===ROLES.BENDAHARA && ['finance','income-input','expenses','dashboard'].map(v=><SidebarLink key={v} active={view===v} onClick={()=>{setView(v);setIsMenuOpen(false)}} icon={getIcon(v)} label={getLabel(v)}/>)}
+            {user.role===ROLES.BENDAHARA && ['finance','income-input','fine-input','expenses','dashboard'].map(v=><SidebarLink key={v} active={view===v} onClick={()=>{setView(v);setIsMenuOpen(false)}} icon={getIcon(v)} label={getLabel(v)}/>)}
           </div>
         </aside>
         <main className="flex-1 w-full overflow-hidden">
