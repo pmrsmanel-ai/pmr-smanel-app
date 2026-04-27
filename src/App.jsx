@@ -2,12 +2,12 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   LayoutDashboard, UserCheck, Wallet, Users, LogOut, Search, Filter, AlertCircle, CheckCircle2, 
   Clock, Loader2, History, Save, ShieldCheck, ClipboardList, Lock, User as UserIcon, Eye, EyeOff, 
-  Settings, Edit2, X, PlusCircle, TrendingDown, TrendingUp, Receipt, Menu, Coins, Trash2, CheckSquare, Calendar, ArrowLeft, Share2
+  Settings, Edit2, X, PlusCircle, TrendingDown, TrendingUp, Receipt, Menu, Coins, Trash2, CheckSquare, Calendar, ArrowLeft, Share2, FileWarning
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 // URL API Google Apps Script 
-const API_URL = "https://script.google.com/macros/s/AKfycbxfo-tgjZY4t_-gy0J90V_OatMAzzVhqztNnWou0mrLnSdpSjhMj_jKFhtv_b1g_Ho-kA/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbw-9xiS2JylMRZ9Mt1SZl8cYCf5gAOHU6VwKGTS7jzoXk1wyCWbnDUrt2XsgRvAJ7kXWA/exec";
 
 // === KONFIGURASI LOGO ===
 const LOGO_URL = "https://i.ibb.co/KjMWMJMf/Tim-lkp-IV.jpg";
@@ -774,7 +774,7 @@ _Sistem Manajemen PMR SMANEL_`;
         <StatCard label="Saldo Denda" val={stats.balDenda} color="yellow" icon={<Coins size={16}/>} />
         <StatCard label="Pemasukan Kas" val={stats.incKas} color="green" icon={<TrendingUp size={16}/>} />
         <StatCard label="Tunggakan (Kas)" val={stats.debtKas} color="orange" icon={<AlertCircle size={16}/>} />
-        <StatCard label="Tunggakan (Denda)" val={stats.debtDenda} color="red" icon={<AlertCircle size={16}/>} />
+        <StatCard label="Tunggakan (Denda)" val={stats.debtDenda} color="red" icon={<FileWarning size={16}/>} />
         <StatCard label="Pengeluaran" val={stats.exp} color="red" icon={<TrendingDown size={16}/>} />
       </div>
       
@@ -1533,6 +1533,16 @@ export default function App() {
   const [toast, setToast] = useState(null);
 
   useEffect(() => { 
+    // Mengubah Title dan Favicon secara otomatis
+    document.title = "PMR SMANEL Management";
+    let link = document.querySelector("link[rel~='icon']");
+    if (!link) {
+      link = document.createElement('link');
+      link.rel = 'icon';
+      document.head.appendChild(link);
+    }
+    link.href = LOGO_URL;
+
     const init = async () => { 
       try { 
         const r = await fetch(`${API_URL}?action=getUsers&t=${Date.now()}`); 
